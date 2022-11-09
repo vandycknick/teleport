@@ -684,14 +684,11 @@ func TestDiscoveryConfig(t *testing.T) {
 		expectedDiscoverySection Discovery
 	}{
 		{
-			desc:          "default",
-			mutate:        func(cfgMap) {},
-			expectError:   require.NoError,
-			expectEnabled: require.False,
-			expectedDiscoverySection: Discovery{
-				AWSMatchers:   []AWSMatcher{},
-				AzureMatchers: []AzureMatcher{},
-			},
+			desc:                     "default",
+			mutate:                   func(cfgMap) {},
+			expectError:              require.NoError,
+			expectEnabled:            require.False,
+			expectedDiscoverySection: Discovery{},
 		},
 		{
 			desc:          "Azure section is filled with defaults",
@@ -1161,12 +1158,31 @@ func TestMakeSampleFileConfig(t *testing.T) {
 		require.Equal(t, "no", fc.Databases.EnabledFlag) // db is always disabled
 	})
 
-	t.Run("Auth server", func(t *testing.T) {
+	t.Run("V3 - auth server", func(t *testing.T) {
 		fc, err := MakeSampleFileConfig(SampleFlags{
+			Version:    defaults.TeleportConfigVersionV3,
 			AuthServer: "auth-server",
 		})
 		require.NoError(t, err)
 		require.Equal(t, "auth-server", fc.AuthServer)
+	})
+
+	t.Run("V3 - proxy server", func(t *testing.T) {
+		fc, err := MakeSampleFileConfig(SampleFlags{
+			Version:      defaults.TeleportConfigVersionV3,
+			ProxyAddress: "proxy.server",
+		})
+		require.NoError(t, err)
+		require.Equal(t, "proxy.server", fc.ProxyServer)
+	})
+
+	t.Run("v2 - auth server", func(t *testing.T) {
+		fc, err := MakeSampleFileConfig(SampleFlags{
+			Version:    defaults.TeleportConfigVersionV2,
+			AuthServer: "auth-server",
+		})
+		require.NoError(t, err)
+		require.Equal(t, []string{"auth-server"}, fc.AuthServers)
 	})
 
 	t.Run("Data dir", func(t *testing.T) {

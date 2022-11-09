@@ -179,8 +179,8 @@ func (s *Server) initAWSWatchers(matchers []services.AWSMatcher) error {
 func (s *Server) initAzureWatchers(ctx context.Context, matchers []services.AzureMatcher) error {
 	vmMatchers, otherMatchers := splitAzureMatchers(matchers)
 
-	var err error
 	if len(vmMatchers) > 0 {
+		var err error
 		s.azureWatcher, err = server.NewAzureWatcher(s.ctx, vmMatchers, s.Clients)
 		if err != nil {
 			return trace.Wrap(err)
@@ -307,9 +307,10 @@ func (s *Server) handleEC2Discovery() {
 	for {
 		select {
 		case instances := <-s.ec2Watcher.InstancesC:
+			ec2Instances := instances.EC2Instances
 			s.Log.Debugf("EC2 instances discovered (AccountID: %s, Instances: %v), starting installation",
-				instances.AccountID, genEC2InstancesLogStr(instances.Instances))
-			if err := s.handleEC2Instances(&instances); err != nil {
+				instances.AccountID, genEC2InstancesLogStr(ec2Instances.Instances))
+			if err := s.handleEC2Instances(ec2Instances); err != nil {
 				if trace.IsNotFound(err) {
 					s.Log.Debug("All discovered EC2 instances are already part of the cluster.")
 				} else {
@@ -376,10 +377,11 @@ func (s *Server) handleAzureDiscovery() {
 	for {
 		select {
 		case instances := <-s.azureWatcher.InstancesC:
+			azureInstances := instances.AzureInstances
 			s.Log.Debugf("Azure instances discovered (SubscriptionID: %s, Instances: %v), starting installation",
-				instances.SubscriptionID, genAzureInstancesLogStr(instances.Instances),
+				instances.SubscriptionID, genAzureInstancesLogStr(azureInstances.Instances),
 			)
-			if err := s.handleAzureInstances(&instances); err != nil {
+			if err := s.handleAzureInstances(azureInstances); err != nil {
 				if trace.IsNotFound(err) {
 					s.Log.Debug("All discovered Azure VMs are already part of the cluster.")
 				} else {

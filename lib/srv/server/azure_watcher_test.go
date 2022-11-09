@@ -18,16 +18,16 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v3"
+	"github.com/stretchr/testify/require"
+
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/lib/cloud/azure"
 	"github.com/gravitational/teleport/lib/services"
-	"github.com/stretchr/testify/require"
 )
 
 func (c *mockClients) GetAzureVirtualMachinesClient(subscription string) (azure.VirtualMachinesClient, error) {
@@ -99,7 +99,7 @@ func TestAzureWatcher(t *testing.T) {
 				Regions:        []string{"location1", "location2"},
 				ResourceTags:   types.Labels{"*": []string{"*"}},
 			},
-			wantVMs: []string{"vm1", "vm2"},
+			wantVMs: []string{"vm1", "vm2", "vm5"},
 		},
 		{
 			name: "filter by location",
@@ -139,11 +139,11 @@ func TestAzureWatcher(t *testing.T) {
 			for len(vmIDs) < len(tc.wantVMs) {
 				select {
 				case results := <-watcher.InstancesC:
-					for _, vm := range results.Instances {
+					for _, vm := range results.AzureInstances.Instances {
 						vmIDs = append(vmIDs, *vm.ID)
 					}
 				case <-ctx.Done():
-					require.Fail(t, fmt.Sprintf("Expected %v VMs, got %v", len(tc.wantVMs), len(vmIDs)))
+					require.Fail(t, "Expected %v VMs, got %v", tc.wantVMs, len(vmIDs))
 				}
 			}
 
