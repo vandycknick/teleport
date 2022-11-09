@@ -93,6 +93,9 @@ type Server struct {
 	ec2Installer *server.SSMInstaller
 	// azureWatcher periodically retrieves Azure virtual machines.
 	azureWatcher *server.Watcher[server.AzureInstances]
+	// azureInstaller is used to start the installation process on discovered Azure
+	// virtual machines.
+	azureInstaller *server.AzureInstaller
 	// kubeFetchers holds all kubernetes fetchers for Azure and other clouds.
 	kubeFetchers []fetchers.Fetcher
 }
@@ -182,6 +185,9 @@ func (s *Server) initAzureWatchers(ctx context.Context, matchers []services.Azur
 		if err != nil {
 			return trace.Wrap(err)
 		}
+		s.azureInstaller = server.NewAzureInstaller(server.AzureInstallerConfig{
+			Emitter: s.Emitter,
+		})
 	}
 
 	for _, matcher := range otherMatchers {
@@ -317,8 +323,52 @@ func (s *Server) handleEC2Discovery() {
 	}
 }
 
+func (s *Server) filterExistingAzureNodes(instances *server.AzureInstances) {
+	nodes := s.nodeWatcher.GetNodes(func(n services.Node) bool {
+		labels := n.GetAllLabels()
+		_, subscriptionOK := labels[types.AzureSubscriptionIDLabel]
+		_, vmOK := labels[types.AzureVMIDLabel]
+		return subscriptionOK && vmOK
+	})
+
+	var filtered []*armcompute.VirtualMachine
+outer:
+	for _, inst := range instances.Instances {
+		for _, node := range nodes {
+			match := types.MatchLabels(node, map[string]string{
+				types.AzureSubscriptionIDLabel: instances.SubscriptionID,
+				types.AzureVMIDLabel:           aws.StringValue(inst.ID),
+			})
+			if match {
+				continue outer
+			}
+		}
+		filtered = append(filtered, inst)
+	}
+	instances.Instances = filtered
+}
+
 func (s *Server) handleAzureInstances(instances *server.AzureInstances) error {
-	return trace.NotImplemented("Automatic Azure node joining not implemented")
+	client, err := s.Clients.GetAzureRunCommandClient(instances.Region)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	s.filterExistingAzureNodes(instances)
+	if len(instances.Instances) == 0 {
+		return trace.NotFound("all fetched nodes already enrolled")
+	}
+
+	s.Log.Debugf("Running Teleport installation on these virtual machines: SubscriptionID: %s, VMs: %s",
+		instances.SubscriptionID, genAzureInstancesLogStr(instances.Instances),
+	)
+	req := server.AzureRunRequest{
+		Client:        client,
+		Instances:     instances.Instances,
+		Region:        instances.Region,
+		ResourceGroup: instances.ResourceGroup,
+		Params:        instances.Parameters,
+	}
+	return trace.Wrap(s.azureInstaller.Run(s.ctx, req))
 }
 
 func (s *Server) handleAzureDiscovery() {

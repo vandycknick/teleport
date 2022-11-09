@@ -38,6 +38,11 @@ type AzureInstances struct {
 	SubscriptionID string
 	// ResourceGroup is the resource group for the instances.
 	ResourceGroup string
+	// ScriptName is the name of the script to execute on the instances to
+	// install Teleport.
+	ScriptName string
+	// Parameters are the parameters passed to the installation script.
+	Parameters map[string]string
 	// Instances is a list of discovered Azure virtual machines.
 	Instances []*armcompute.VirtualMachine
 }
@@ -85,6 +90,7 @@ type azureInstanceFetcher struct {
 	Subscription  string
 	ResourceGroup string
 	Labels        types.Labels
+	Parameters    map[string]string
 }
 
 func newAzureInstanceFetcher(cfg azureFetcherConfig) *azureInstanceFetcher {
@@ -94,6 +100,10 @@ func newAzureInstanceFetcher(cfg azureFetcherConfig) *azureInstanceFetcher {
 		Subscription:  cfg.Subscription,
 		ResourceGroup: cfg.ResourceGroup,
 		Labels:        cfg.Matcher.ResourceTags,
+		Parameters: map[string]string{
+			"token":      cfg.Matcher.Params.JoinToken,
+			"scriptName": cfg.Matcher.Params.ScriptName,
+		},
 	}
 }
 

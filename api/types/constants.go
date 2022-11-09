@@ -354,6 +354,14 @@ const (
 	// found via automatic discovery, to avoid re-running installation
 	// commands on the node.
 	AWSInstanceIDLabel = TeleportNamespace + "/instance-id"
+	// AzureSubscriptionIDLabel is used to identify virtual machines by Azure
+	// subscription ID found via automatic discovery, to avoid re-running
+	// installation commands on the node.
+	AzureSubscriptionIDLabel = TeleportNamespace + "/subscription-id"
+	// AzureVMIDLabel is used to identify virtual machines by ID found
+	// via automatic discovery, to avoid re-running installation commands
+	// on the node.
+	AzureVMIDLabel = TeleportNamespace + "/vm-id"
 )
 
 // CloudHostnameTag is the name of the tag in a cloud instance used to override a node's hostname.

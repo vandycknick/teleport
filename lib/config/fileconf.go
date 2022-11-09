@@ -520,6 +520,29 @@ func checkAndSetDefaultsForAzureMatchers(matcherInput []AzureMatcher) error {
 			}
 		}
 
+		if matcher.InstallParams == nil {
+			matcher.InstallParams = &InstallParams{
+				JoinParams: JoinParams{
+					TokenName: defaults.AzureInviteTokenName,
+					Method:    types.JoinMethodToken,
+				},
+				ScriptName: installers.AzureInstallerScriptName,
+			}
+		} else {
+			if method := matcher.InstallParams.JoinParams.Method; method == "" {
+				matcher.InstallParams.JoinParams.Method = types.JoinMethodToken
+			} else if method != types.JoinMethodToken {
+				return trace.BadParameter("only token joining is supported for Azure auto-discovery")
+			}
+			if token := matcher.InstallParams.JoinParams.TokenName; token == "" {
+				matcher.InstallParams.JoinParams.TokenName = defaults.AzureInviteTokenName
+			}
+
+			if installer := matcher.InstallParams.ScriptName; installer == "" {
+				matcher.InstallParams.ScriptName = installers.AzureInstallerScriptName
+			}
+		}
+
 		if apiutils.SliceContainsStr(matcher.Regions, types.Wildcard) || len(matcher.Regions) == 0 {
 			matcher.Regions = []string{types.Wildcard}
 		}
@@ -1338,10 +1361,10 @@ type AWSMatcher struct {
 // InstallParams sets join method to use on discovered nodes
 type InstallParams struct {
 	// JoinParams sets the token and method to use when generating
-	// config on EC2 instances
+	// config on cloud instances
 	JoinParams JoinParams `yaml:"join_params,omitempty"`
 	// ScriptName is the name of the teleport installer script
-	// resource for the EC2 instance to execute
+	// resource for the cloud instance to execute
 	ScriptName string `yaml:"script_name,omitempty"`
 }
 
@@ -1364,6 +1387,9 @@ type AzureMatcher struct {
 	Regions []string `yaml:"regions,omitempty"`
 	// ResourceTags are Azure tags on resources to match.
 	ResourceTags map[string]apiutils.Strings `yaml:"tags,omitempty"`
+	// InstallParams sets the join method when installing on
+	// discovered Azure nodes
+	InstallParams *InstallParams `yaml:"install,omitempty"`
 }
 
 // Database represents a single database proxied by the service.

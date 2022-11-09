@@ -41,3 +41,14 @@ type Template struct {
 	// MajorVersion is the major version of the Teleport auth node
 	MajorVersion string
 }
+
+// TODO: embed
+var defaultAzureInstallScript string
+
+// AzureInstallerScriptName is the name of the default populated Azure
+// installer script.
+const AzureInstallerScriptName = "default-azure-installer"
+
+// DefaultAzureInstaller represents the default Azure installer script
+// provided by Teleport.
+var DefaultAzureInstaller = types.MustNewInstallerV1(AzureInstallerScriptName, defaultAzureInstallScript)

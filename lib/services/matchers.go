@@ -74,6 +74,8 @@ type AzureMatcher struct {
 	Regions []string
 	// ResourceTags are Azure tags to match.
 	ResourceTags types.Labels
+	// Params are passed to Azure when installing.
+	Params InstallerParams
 }
 
 // MatchResourceLabels returns true if any of the provided selectors matches the provided database.

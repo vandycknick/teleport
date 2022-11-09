@@ -20,6 +20,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v3"
 	"github.com/gravitational/trace"
 )
@@ -121,4 +122,76 @@ func (c *vmClient) ListVirtualMachines(ctx context.Context, resourceGroup string
 	}
 
 	return virtualMachines, nil
+}
+
+// vmRunCommand provides an interface for an Azure Run Command client.
+type vmRunCommand interface {
+	BeginCreateOrUpdate(ctx context.Context, resourceGroup, vmName, runCommandName string, runCommand armcompute.VirtualMachineRunCommand, options *armcompute.VirtualMachineRunCommandsClientBeginCreateOrUpdateOptions) (*runtime.Poller[armcompute.VirtualMachineRunCommandsClientCreateOrUpdateResponse], error)
+}
+
+// RunCommandRequest combines parameters for running a command on an Azure virtual machine.
+type RunCommandRequest struct {
+	// Region is the region of the VM.
+	Region string
+	// ResourceGroup is the resource group for the VM.
+	ResourceGroup string
+	// VMName is the name of the VM.
+	VMName string
+	// ScriptURI is the URI of the script for the virtual machine to execute.
+	ScriptURI string
+	// Parameters is a map of parameters for the script.
+	Parameters map[string]string
+}
+
+// RunCommandClient is a client for Azure Run Commands.
+type RunCommandClient interface {
+	Run(ctx context.Context, req RunCommandRequest) error
+}
+
+type runCommandClient struct {
+	api vmRunCommand
+}
+
+// NewRunCommandClient creates a new Azure Run Command client by subscription
+// and credentials.
+func NewRunCommandClient(subscription string, cred azcore.TokenCredential, options *arm.ClientOptions) (RunCommandClient, error) {
+	runCommandAPI, err := armcompute.NewVirtualMachineRunCommandsClient(subscription, cred, options)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return NewRunCommandClientByAPI(runCommandAPI), nil
+}
+
+// NewRunCommandClientByAPI creates a new Azure Run Command client by ARM API
+// client.
+func NewRunCommandClientByAPI(api vmRunCommand) RunCommandClient {
+	return &runCommandClient{
+		api: api,
+	}
+}
+
+// Run runs a command on a virtual machine.
+func (c *runCommandClient) Run(ctx context.Context, req RunCommandRequest) error {
+	var params []*armcompute.RunCommandInputParameter
+	for name, value := range req.Parameters {
+		params = append(params, &armcompute.RunCommandInputParameter{
+			Name:  to.Ptr(name),
+			Value: to.Ptr(value),
+		})
+	}
+	poller, err := c.api.BeginCreateOrUpdate(ctx, req.ResourceGroup, req.VMName, "RunShellScript", armcompute.VirtualMachineRunCommand{
+		Location: to.Ptr(req.Region),
+		Properties: &armcompute.VirtualMachineRunCommandProperties{
+			AsyncExecution: to.Ptr(false),
+			Parameters:     params,
+			Source: &armcompute.VirtualMachineRunCommandScriptSource{
+				ScriptURI: to.Ptr(req.Parameters["scriptName"]),
+			},
+		},
+	}, nil)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	_, err = poller.PollUntilDone(ctx, nil)
+	return trace.Wrap(err)
 }

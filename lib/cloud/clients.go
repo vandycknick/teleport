@@ -115,6 +115,8 @@ type AzureClients interface {
 	GetAzureKubernetesClient(subscription string) (azure.AKSClient, error)
 	// GetAzureVirtualMachinesClient returns an Azure Virtual Machines client for the given subscription.
 	GetAzureVirtualMachinesClient(subscription string) (azure.VirtualMachinesClient, error)
+	// GetAzureRunCommandClient returns an Azure Run Command client for the given subscription.
+	GetAzureRunCommandClient(subscription string) (azure.RunCommandClient, error)
 }
 
 // NewClients returns a new instance of cloud clients retriever.
@@ -128,6 +130,7 @@ func NewClients() Clients {
 			azureRedisEnterpriseClients: azure.NewClientMap(azure.NewRedisEnterpriseClient),
 			azureKubernetesClient:       make(map[string]azure.AKSClient),
 			azureVirtualMachinesClients: azure.NewClientMap(azure.NewVirtualMachinesClient),
+			azureRunCommandClients:      azure.NewClientMap(azure.NewRunCommandClient),
 		},
 	}
 }
@@ -168,6 +171,8 @@ type azureClients struct {
 	azureKubernetesClient map[string]azure.AKSClient
 	// azureVirtualMachinesClients contains the cached Azure Virtual Machines clients.
 	azureVirtualMachinesClients azure.ClientMap[azure.VirtualMachinesClient]
+	// azureRunCommandClients contains the cached Azure Run Command clients.
+	azureRunCommandClients azure.ClientMap[azure.RunCommandClient]
 }
 
 // GetAWSSession returns AWS session for the specified region.
@@ -373,6 +378,12 @@ func (c *cloudClients) GetAzureKubernetesClient(subscription string) (azure.AKSC
 // the given subscription.
 func (c *cloudClients) GetAzureVirtualMachinesClient(subscription string) (azure.VirtualMachinesClient, error) {
 	return c.azureVirtualMachinesClients.Get(subscription, c.GetAzureCredential)
+}
+
+// GetAzureRunCommandClient returns an Azure Run Command client for the given
+// subscription.
+func (c *cloudClients) GetAzureRunCommandClient(subscription string) (azure.RunCommandClient, error) {
+	return c.azureRunCommandClients.Get(subscription, c.GetAzureCredential)
 }
 
 // Close closes all initialized clients.
@@ -596,6 +607,7 @@ type TestCloudClients struct {
 	AzureAKSClientPerSub    map[string]azure.AKSClient
 	AzureAKSClient          azure.AKSClient
 	AzureVirtualMachines    azure.VirtualMachinesClient
+	AzureRunCommand         azure.RunCommandClient
 }
 
 // GetAWSSession returns AWS session for the specified region.
@@ -721,6 +733,11 @@ func (c *TestCloudClients) GetAzureRedisEnterpriseClient(subscription string) (a
 // the given subscription.
 func (c *TestCloudClients) GetAzureVirtualMachinesClient(subscription string) (azure.VirtualMachinesClient, error) {
 	return c.AzureVirtualMachines, nil
+}
+
+// GetAzureRunCommand returns an Azure Run Command client for the given subscription.
+func (c *TestCloudClients) GetAzureRunCommandClient(subscription string) (azure.RunCommandClient, error) {
+	return c.AzureRunCommand, nil
 }
 
 // Close closes all initialized clients.

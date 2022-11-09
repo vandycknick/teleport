@@ -906,3 +906,9 @@ const (
 	// token to use when templating the script to be executed.
 	IAMInviteTokenName = "aws-discovery-iam-token"
 )
+
+const (
+	// AzureInviteTokenName is th ename of the default token to use
+	// when templating the script to be executed.
+	AzureInviteTokenName = "azure-discovery-token"
+)
