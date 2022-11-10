@@ -42,7 +42,7 @@ type Template struct {
 	MajorVersion string
 }
 
-// TODO: embed
+//go:embed azure-installer.sh.tmpl
 var defaultAzureInstallScript string
 
 // AzureInstallerScriptName is the name of the default populated Azure

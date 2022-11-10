@@ -694,6 +694,8 @@ type ReadDiscoveryAccessPoint interface {
 	GetKubernetesCluster(ctx context.Context, name string) (types.KubeCluster, error)
 	// GetKubernetesClusters returns all kubernetes cluster resources.
 	GetKubernetesClusters(ctx context.Context) ([]types.KubeCluster, error)
+	// GetInstaller gets the cluster installer resource.
+	GetInstaller(ctx context.Context, name string) (types.Installer, error)
 }
 
 // DiscoveryAccessPoint is an API interface implemented by a certificate authority (CA) to be
@@ -711,6 +713,8 @@ type DiscoveryAccessPoint interface {
 	UpdateKubernetesCluster(ctx context.Context, cluster types.KubeCluster) error
 	// DeleteKubernetesCluster deletes specified kubernetes cluster resource.
 	DeleteKubernetesCluster(ctx context.Context, name string) error
+	// GenerateToken generates a new auth token for the given service roles.
+	GenerateToken(ctx context.Context, req *proto.GenerateTokenRequest) (string, error)
 }
 
 // AccessCache is a subset of the interface working on the certificate authorities
@@ -1073,6 +1077,11 @@ func (w *DiscoveryWrapper) UpdateKubernetesCluster(ctx context.Context, cluster 
 // DeleteKubernetesCluster deletes specified kubernetes cluster resource.
 func (w *DiscoveryWrapper) DeleteKubernetesCluster(ctx context.Context, name string) error {
 	return w.NoCache.DeleteKubernetesCluster(ctx, name)
+}
+
+// GenerateToken generates a new auth token for the given service roles.
+func (w *DiscoveryWrapper) GenerateToken(ctx context.Context, req *proto.GenerateTokenRequest) (string, error) {
+	return w.NoCache.GenerateToken(ctx, req)
 }
 
 // Close closes all associated resources

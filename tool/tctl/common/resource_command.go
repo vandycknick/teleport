@@ -861,9 +861,10 @@ func (rc *ResourceCommand) Delete(ctx context.Context, client auth.ClientI) (err
 		if err != nil {
 			return trace.Wrap(err)
 		}
-		if rc.ref.Name == installers.InstallerScriptName {
-			fmt.Printf("%s has been reset to a default value\n", rc.ref.Name)
-		} else {
+		switch name := rc.ref.Name; name {
+		case installers.InstallerScriptName, installers.AzureInstallerScriptName:
+			fmt.Printf("%s has been reset to a default value\n", name)
+		default:
 			fmt.Printf("%s has been deleted\n", rc.ref.Name)
 		}
 

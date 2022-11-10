@@ -142,6 +142,7 @@ func (f *azureInstanceFetcher) GetInstances(ctx context.Context) ([]Instances, e
 				Region:         region,
 				ResourceGroup:  f.ResourceGroup,
 				Instances:      vms,
+				ScriptName:     f.Parameters["scriptName"],
 			}})
 		}
 	}

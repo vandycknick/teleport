@@ -1,0 +1,47 @@
+#!/bin/sh
+(
+  flock -n 9 || exit 1
+  if test -f /usr/local/bin/teleport; then
+    exit 0
+  fi
+
+  distro_id="$(awk -F= '$1 == "ID" { print tolower($2) }' /etc/os-release | xargs echo)"
+  if [ "$distro_id" = "debian" ] || [ "$distro_id" = "ubuntu" ]; then
+    sudo curl https://deb.releases.teleport.dev/teleport-pubkey.asc \
+      -o /usr/share/keyrings/teleport-archive-keyring.asc
+	. /etc/os-release
+    echo "deb [signed-by=/usr/share/keyrings/teleport-archive-keyring.asc]  https://apt.releases.teleport.dev/${ID?} ${VERSION_CODENAME?} stable/{{ .MajorVersion }}" |
+      sudo tee /etc/apt/sources.list.d/teleport.list >/dev/null
+    sudo apt-get update
+    sudo apt-get install -y teleport jq
+  elif [ "$distro_id" = "amzn" ] || [ "$distro_id" = "rhel" ]; then
+    . /etc/os-release
+    sudo yum-config-manager --add-repo \
+      "$(rpm --eval "https://yum.releases.teleport.dev/$ID/$VERSION_ID/Teleport/%{_arch}/stable/{{ .MajorVersion }}/teleport.repo")"
+    sudo yum install -y teleport jq
+  else
+    echo "Unsupported distro: $distro_id"
+    exit 1
+  fi
+
+  API_VERSION=$(curl -m5 -sS -H "Metadata:true" --noproxy "*" "http://169.254.169.254/metadata/versions" | jq -r ".apiVersions.[length -1]")
+  INSTANCE_INFO=$(curl -m5 -sS -H "Metadata:true" --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=$API_VERSION&format=json")
+
+  REGION="$(echo "$INSTANCE_INFO" | jq -r .compute.location)"
+  RESOURCE_GROUP="$(echo "$INSTANCE_INFO" | jq -r .compute.resourceGroupName)"
+  SUBSCRIPTION_ID="$(echo "$INSTANCE_INFO" | jq -r .compute.subscriptionId)"
+  VM_ID="$(echo "$INSTANCE_INFO" | jq -r .compute.vmId)"
+
+  # generate teleport ssh config
+  # token is read as a parameter from the run command and
+  # passed as the first argument to the script
+  sudo /usr/local/bin/teleport node configure \
+    --proxy="{{ .PublicProxyAddr }}" \
+    --token="$1" \
+    --output=file \
+    --labels="teleport.dev/vm-id=${VM_ID},teleport.dev/account-id=${SUBSCRIPTION_ID},teleport.dev/region=${REGION},teleport.dev/resource-group=${RESOURCE_GROUP}"
+
+  # enable and start teleport service
+  sudo systemctl enable --now teleport
+
+) 9>/var/lock/teleport_install.lock

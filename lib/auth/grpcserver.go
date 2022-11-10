@@ -4099,8 +4099,14 @@ func (g *GRPCServer) GetInstaller(ctx context.Context, req *types.ResourceReques
 	}
 	res, err := auth.GetInstaller(ctx, req.Name)
 	if err != nil {
-		if trace.IsNotFound(err) && req.Name == installers.InstallerScriptName {
-			return installers.DefaultInstaller, nil
+		if trace.IsNotFound(err) {
+			switch req.Name {
+			case installers.InstallerScriptName:
+				return installers.DefaultInstaller, nil
+			case installers.AzureInstallerScriptName:
+				return installers.DefaultAzureInstaller, nil
+			}
+
 		}
 		return nil, trace.Wrap(err)
 	}
@@ -4122,28 +4128,29 @@ func (g *GRPCServer) GetInstallers(ctx context.Context, _ *emptypb.Empty) (*type
 		return nil, trace.Wrap(err)
 	}
 	var installersV1 []*types.InstallerV1
-	needDefault := true
+	defaultInstallers := map[string]*types.InstallerV1{
+		installers.InstallerScriptName:      installers.DefaultInstaller,
+		installers.AzureInstallerScriptName: installers.DefaultAzureInstaller,
+	}
+
 	for _, inst := range res {
 		instV1, ok := inst.(*types.InstallerV1)
 		if !ok {
 			return nil, trace.BadParameter("unsupported installer type %T", inst)
 		}
-		if inst.GetName() == installers.InstallerScriptName {
-			needDefault = false
+		// Filter out default installers if they aren't needed.
+		for name := range defaultInstallers {
+			if name == inst.GetName() {
+				delete(defaultInstallers, name)
+				break
+			}
 		}
+
 		installersV1 = append(installersV1, instV1)
 	}
 
-	if len(installersV1) == 0 {
-		return &types.InstallerV1List{
-			Installers: []*types.InstallerV1{
-				installers.DefaultInstaller,
-			},
-		}, nil
-	}
-
-	if needDefault {
-		installersV1 = append(installersV1, installers.DefaultInstaller)
+	for _, inst := range defaultInstallers {
+		installersV1 = append(installersV1, inst)
 	}
 
 	return &types.InstallerV1List{

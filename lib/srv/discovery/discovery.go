@@ -186,7 +186,8 @@ func (s *Server) initAzureWatchers(ctx context.Context, matchers []services.Azur
 			return trace.Wrap(err)
 		}
 		s.azureInstaller = server.NewAzureInstaller(server.AzureInstallerConfig{
-			Emitter: s.Emitter,
+			Emitter:     s.Emitter,
+			AccessPoint: s.AccessPoint,
 		})
 	}
 
@@ -368,6 +369,7 @@ func (s *Server) handleAzureInstances(instances *server.AzureInstances) error {
 		Region:        instances.Region,
 		ResourceGroup: instances.ResourceGroup,
 		Params:        instances.Parameters,
+		ScriptName:    instances.ScriptName,
 	}
 	return trace.Wrap(s.azureInstaller.Run(s.ctx, req))
 }
