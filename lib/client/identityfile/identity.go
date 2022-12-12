@@ -210,11 +210,8 @@ func Write(cfg WriteConfig) (filesWritten []string, err error) {
 		for _, ca := range cfg.Key.TrustedCA {
 			// append ssh ca certificates
 			for _, publicKey := range ca.HostCertificates {
-				data, err := sshutils.MarshalAuthorizedHostsFormat(ca.ClusterName, publicKey, nil)
-				if err != nil {
-					return nil, trace.Wrap(err)
-				}
-				idFile.CACerts.SSH = append(idFile.CACerts.SSH, []byte(data))
+				authorizedHost := sshutils.MarshalAuthorizedHostsFormat(ca.ClusterName, "" /* proxyHost */, publicKey)
+				idFile.CACerts.SSH = append(idFile.CACerts.SSH, []byte(authorizedHost))
 			}
 			// append tls ca certificates
 			idFile.CACerts.TLS = append(idFile.CACerts.TLS, ca.TLSCertificates...)
