@@ -116,3 +116,15 @@ func (s *JoinServiceGRPCServer) registerUsingIAMMethod(ctx context.Context, srv 
 		Certs: certs,
 	}))
 }
+
+// RegisterUsingAzureMethod allows nodes and proxies to join the cluster using the
+// Azure join method.
+//
+// The server will generate a base64-encoded crypto-random challenge and
+// send it on the server stream. The caller is expected to respond on
+// the client stream with a RegisterUsingTokenRequest including a signed
+// attested data document with the challenge string. Finally, the signed
+// cluster certs are sent on the server stream.
+func (s *JoinServiceGRPCServer) RegisterUsingAzureMethod(srv proto.JoinService_RegisterUsingAzureMethodServer) error {
+	return nil
+}

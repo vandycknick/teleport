@@ -109,6 +109,11 @@ func (a *Server) RegisterUsingToken(ctx context.Context, req *types.RegisterUsin
 		return nil, trace.AccessDenied("this token is only valid for the IAM " +
 			"join method but the node has connected to the wrong endpoint, make " +
 			"sure your node is configured to use the IAM join method")
+	case types.JoinMethodAzure:
+		// Azure join method must use the gRPC RegisterUsingAzureMethod
+		return nil, trace.AccessDenied("this token is only valid for the Azure " +
+			"join method but the node has connected to the wrong endpoint, make " +
+			"sure your node is configured to use the Azure join method")
 	case types.JoinMethodGitHub:
 		if err := a.checkGitHubJoinRequest(ctx, req); err != nil {
 			return nil, trace.Wrap(err)
