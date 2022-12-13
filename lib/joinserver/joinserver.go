@@ -33,8 +33,11 @@ import (
 
 const iamJoinRequestTimeout = time.Minute
 
+const azureJoinRequestTimeout = time.Minute // TODO: should this and iamJoinRequestTimeout be merged?
+
 type joinServiceClient interface {
-	RegisterUsingIAMMethod(ctx context.Context, challengeResponse client.RegisterChallengeResponseFunc) (*proto.Certs, error)
+	RegisterUsingIAMMethod(ctx context.Context, challengeResponse client.RegisterIAMChallengeResponseFunc) (*proto.Certs, error)
+	RegisterUsingAzureMethod(ctx context.Context, challengeResponse client.RegisterAzureChallengeResponseFunc) (*proto.Certs, error)
 }
 
 // JoinServiceGRPCServer implements proto.JoinServiceServer and is designed
@@ -126,5 +129,47 @@ func (s *JoinServiceGRPCServer) registerUsingIAMMethod(ctx context.Context, srv 
 // attested data document with the challenge string. Finally, the signed
 // cluster certs are sent on the server stream.
 func (s *JoinServiceGRPCServer) RegisterUsingAzureMethod(srv proto.JoinService_RegisterUsingAzureMethodServer) error {
-	return nil
+	ctx := srv.Context()
+
+	timeout := s.clock.After(azureJoinRequestTimeout)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- s.registerUsingAzureMethod(ctx, srv)
+	}()
+	select {
+	case err := <-errCh:
+		return trace.Wrap(err)
+	case <-timeout:
+		nodeAddr := ""
+		if peerInfo, ok := peer.FromContext(ctx); ok {
+			nodeAddr = peerInfo.Addr.String()
+		}
+		logrus.Warnf("Azure join attempt timed out, node at (%s) is misbehaving or did not close the connection after encountering an error.", nodeAddr)
+		// Returning here should cancel any blocked Send or Recv operations.
+		return trace.LimitExceeded("RegisterUsingAzureMethod timed out after %s, terminating the stream on the server", azureJoinRequestTimeout)
+	case <-ctx.Done():
+		return trace.Wrap(ctx.Err())
+	}
+}
+
+func (s *JoinServiceGRPCServer) registerUsingAzureMethod(ctx context.Context, srv proto.JoinService_RegisterUsingAzureMethodServer) error {
+	certs, err := s.joinServiceClient.RegisterUsingAzureMethod(ctx, func(challenge string) (*proto.RegisterUsingAzureMethodRequest, error) {
+		err := srv.Send(&proto.RegisterUsingAzureMethodResponse{
+			Challenge: challenge,
+		})
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+
+		req, err := srv.Recv()
+		return req, trace.Wrap(err)
+	})
+	if err != nil {
+		return trace.Wrap(err)
+	}
+
+	return trace.Wrap(srv.Send(&proto.RegisterUsingAzureMethodResponse{
+		Certs: certs,
+	}))
 }

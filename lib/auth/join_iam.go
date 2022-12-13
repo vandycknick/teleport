@@ -376,7 +376,7 @@ func withFips(fips bool) iamRegisterOption {
 // The caller must provide a ChallengeResponseFunc which returns a
 // *types.RegisterUsingTokenRequest with a signed sts:GetCallerIdentity request
 // including the challenge as a signed header.
-func (a *Server) RegisterUsingIAMMethod(ctx context.Context, challengeResponse client.RegisterChallengeResponseFunc, opts ...iamRegisterOption) (*proto.Certs, error) {
+func (a *Server) RegisterUsingIAMMethod(ctx context.Context, challengeResponse client.RegisterIAMChallengeResponseFunc, opts ...iamRegisterOption) (*proto.Certs, error) {
 	cfg := defaultIAMRegisterConfig(a.fips)
 	for _, opt := range opts {
 		opt(cfg)

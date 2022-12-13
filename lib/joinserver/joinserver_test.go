@@ -37,18 +37,28 @@ import (
 )
 
 type mockJoinServiceClient struct {
-	sendChallenge        string
-	returnCerts          *proto.Certs
-	returnError          error
-	gotChallengeResponse *proto.RegisterUsingIAMMethodRequest
+	sendChallenge             string
+	returnCerts               *proto.Certs
+	returnError               error
+	gotIAMChallengeResponse   *proto.RegisterUsingIAMMethodRequest
+	gotAzureChallengeResponse *proto.RegisterUsingAzureMethodRequest
 }
 
-func (c *mockJoinServiceClient) RegisterUsingIAMMethod(ctx context.Context, challengeResponse client.RegisterChallengeResponseFunc) (*proto.Certs, error) {
+func (c *mockJoinServiceClient) RegisterUsingIAMMethod(ctx context.Context, challengeResponse client.RegisterIAMChallengeResponseFunc) (*proto.Certs, error) {
 	resp, err := challengeResponse(c.sendChallenge)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	c.gotChallengeResponse = resp
+	c.gotIAMChallengeResponse = resp
+	return c.returnCerts, c.returnError
+}
+
+func (c *mockJoinServiceClient) RegisterUsingAzureMethod(ctx context.Context, challengeResponse client.RegisterAzureChallengeResponseFunc) (*proto.Certs, error) {
+	resp, err := challengeResponse(c.sendChallenge)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	c.gotAzureChallengeResponse = resp
 	return c.returnCerts, c.returnError
 }
 
@@ -212,7 +222,7 @@ func TestJoinServiceGRPCServer_RegisterUsingIAMMethod(t *testing.T) {
 					// client should get the certs from auth
 					require.Equal(t, tc.certs, certs)
 					// auth should get the challenge response from client
-					require.Equal(t, tc.challengeResponse, testPack.mockAuthServer.gotChallengeResponse)
+					require.Equal(t, tc.challengeResponse, testPack.mockAuthServer.gotIAMChallengeResponse)
 				})
 			}
 		})

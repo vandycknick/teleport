@@ -532,7 +532,8 @@ func pinRegisterClient(params RegisterParams) (*Client, error) {
 }
 
 type joinServiceClient interface {
-	RegisterUsingIAMMethod(ctx context.Context, challengeResponse client.RegisterChallengeResponseFunc) (*proto.Certs, error)
+	RegisterUsingIAMMethod(ctx context.Context, challengeResponse client.RegisterIAMChallengeResponseFunc) (*proto.Certs, error)
+	RegisterUsingAzureMethod(ctx context.Context, challengeResponse client.RegisterAzureChallengeResponseFunc) (*proto.Certs, error)
 }
 
 // registerUsingIAMMethod is used to register using the IAM join method. It is
