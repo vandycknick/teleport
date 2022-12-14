@@ -173,9 +173,11 @@ func (s *Server) matcher(resource types.ResourceWithLabels) bool {
 		return false
 	}
 
-	// In the case of CloudOrigin CloudHosted resources the matchers should be skipped.
-	if cloudOrigin(resource) && database.IsCloudHosted() {
-		return true // Cloud fetchers return only matching databases.
+	// In case the database resource is auto-discovered by fetchers from this
+	// agent, skips the resource labels. Cloud fetchers return only matching
+	// databases.
+	if cloudOrigin(resource) && s.monitoredDatabases.isCloudDatabase(database) {
+		return true
 	}
 	return services.MatchResourceLabels(s.cfg.ResourceMatchers, database)
 }

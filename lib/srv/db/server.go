@@ -42,16 +42,19 @@ import (
 	"github.com/gravitational/teleport/lib/reversetunnel"
 	"github.com/gravitational/teleport/lib/services"
 	"github.com/gravitational/teleport/lib/srv"
+
 	// Import to register Cassandra engine.
 	_ "github.com/gravitational/teleport/lib/srv/db/cassandra"
 	"github.com/gravitational/teleport/lib/srv/db/cloud"
 	"github.com/gravitational/teleport/lib/srv/db/cloud/users"
 	"github.com/gravitational/teleport/lib/srv/db/common"
+
 	// Import to register Elasticsearch engine.
 	_ "github.com/gravitational/teleport/lib/srv/db/elasticsearch"
 	// Import to register MongoDB engine.
 	_ "github.com/gravitational/teleport/lib/srv/db/mongodb"
 	"github.com/gravitational/teleport/lib/srv/db/mysql"
+
 	// Import to register Postgres engine.
 	_ "github.com/gravitational/teleport/lib/srv/db/postgres"
 	// Import to register Redis engine.
@@ -269,7 +272,7 @@ type monitoredDatabases struct {
 	// cloud are databases detected by cloud watchers.
 	cloud types.Databases
 	// mu protects access to the fields.
-	mu sync.Mutex
+	mu sync.RWMutex
 }
 
 func (m *monitoredDatabases) setResources(databases types.Databases) {
@@ -285,9 +288,20 @@ func (m *monitoredDatabases) setCloud(databases types.Databases) {
 }
 
 func (m *monitoredDatabases) get() types.ResourcesWithLabelsMap {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return append(append(m.static, m.resources...), m.cloud...).AsResources().ToMap()
+}
+
+func (m *monitoredDatabases) isCloudDatabase(db types.Database) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for i := range m.cloud {
+		if m.cloud[i] == db {
+			return true
+		}
+	}
+	return false
 }
 
 // New returns a new database server.

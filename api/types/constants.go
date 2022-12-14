@@ -360,10 +360,6 @@ const (
 	// imported from a cloud provider.
 	OriginCloud = "cloud"
 
-	// OriginCloudDiscovery is an origin value indicating that the resource
-	// was imported from a cloud provider through discovery service.
-	OriginCloudDiscovery = "cloud-discovery"
-
 	// OriginKubernetes is an origin value indicating that the resource was
 	// created from the Kubernetes Operator.
 	OriginKubernetes = "kubernetes"
@@ -404,7 +400,7 @@ const (
 )
 
 // OriginValues lists all possible origin values.
-var OriginValues = []string{OriginDefaults, OriginConfigFile, OriginDynamic, OriginCloud, OriginKubernetes, OriginCloudDiscovery}
+var OriginValues = []string{OriginDefaults, OriginConfigFile, OriginDynamic, OriginCloud, OriginKubernetes}
 
 const (
 	// RecordAtNode is the default. Sessions are recorded at Teleport nodes.

@@ -74,11 +74,6 @@ func (s *Server) startDatabaseDiscovery() error {
 			case databases := <-watcher.DatabasesC():
 				mu.Lock()
 				newDatabases = databases
-
-				// Overwrite origin.
-				for _, database := range newDatabases {
-					database.SetOrigin(types.OriginCloudDiscovery)
-				}
 				mu.Unlock()
 
 				if err := reconciler.Reconcile(s.ctx); err != nil {
@@ -102,7 +97,7 @@ func (s *Server) getCurrentDatabases() types.ResourcesWithLabelsMap {
 		return nil
 	}
 
-	return types.Databases(filterResourcesByOrigin(databases, types.OriginCloudDiscovery)).AsResources().ToMap()
+	return types.Databases(filterResourcesByOrigin(databases, types.OriginCloud)).AsResources().ToMap()
 }
 
 func (s *Server) onDatabaseCreate(ctx context.Context, resource types.ResourceWithLabels) error {

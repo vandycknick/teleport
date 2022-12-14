@@ -591,6 +591,10 @@ func (rc *ResourceCommand) createDatabase(ctx context.Context, client auth.Clien
 	if err != nil {
 		return trace.Wrap(err)
 	}
+
+	// Overwrite origin.
+	database.SetOrigin(types.OriginDynamic)
+
 	if err := client.CreateDatabase(ctx, database); err != nil {
 		if trace.IsAlreadyExists(err) {
 			if !rc.force {
