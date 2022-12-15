@@ -33,8 +33,10 @@ type SystemRoles []SystemRole
 const (
 	// RoleAuth is for teleport auth server (authority, authentication and authorization)
 	RoleAuth SystemRole = "Auth"
-	// RoleNode is a role for SSH node in the cluster
+	// RoleNode is a role for a Teleport SSH node in the cluster
 	RoleNode SystemRole = "Node"
+	// RoleOpenSSHNode is a registered OpenSSH node in the cluster
+	RoleOpenSSHNode SystemRole = "OpenSSHNode"
 	// RoleProxy is a role for SSH proxy in the cluster
 	RoleProxy SystemRole = "Proxy"
 	// RoleAdmin is admin role

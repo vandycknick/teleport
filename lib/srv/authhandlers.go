@@ -30,6 +30,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/exp/slices"
 
 	"github.com/gravitational/teleport"
 	"github.com/gravitational/teleport/api/types"
@@ -407,7 +408,13 @@ func (h *AuthHandlers) UserKeyAuth(conn ssh.ConnMetadata, key ssh.PublicKey) (*s
 	case h.c.Component == teleport.ComponentForwardingNode:
 		err = h.canLoginWithoutRBAC(cert, clusterName.GetClusterName(), teleportUser, conn.User())
 	default:
-		err = h.canLoginWithRBAC(cert, clusterName.GetClusterName(), teleportUser, conn.User())
+		err = h.canLoginWithRBAC(
+			cert,
+			h.c.Server.GetInfo(),
+			clusterName.GetClusterName(),
+			teleportUser,
+			conn.User(),
+		)
 	}
 	if err != nil {
 		log.Errorf("Permission denied: %v", err)
@@ -459,22 +466,77 @@ func (h *AuthHandlers) maybeAppendDiagnosticTrace(ctx context.Context, connectio
 // generated the certificate. If the target server presents a public key, if
 // we are strictly checking keys, we reject the target server. If we are not
 // we take whatever.
-func (h *AuthHandlers) HostKeyAuth(addr string, remote net.Addr, key ssh.PublicKey) error {
-	// Check if the given host key was signed by a Teleport certificate
-	// authority (CA) or fallback to host key checking if it's allowed.
-	certChecker := apisshutils.CertChecker{
-		CertChecker: ssh.CertChecker{
-			IsHostAuthority: h.IsHostAuthority,
-			HostKeyFallback: h.hostKeyCallback,
-			Clock:           h.c.Clock.Now,
-		},
-		FIPS: h.c.FIPS,
+func (h *AuthHandlers) NewHostKeyAuth(identityCtx IdentityContext) ssh.HostKeyCallback {
+	return func(addr string, remote net.Addr, key ssh.PublicKey) error {
+		// Check if the given host key was signed by a Teleport certificate
+		// authority (CA) or fallback to host key checking if it's allowed.
+		certChecker := apisshutils.CertChecker{
+			CertChecker: ssh.CertChecker{
+				IsHostAuthority: h.IsHostAuthority,
+				HostKeyFallback: h.hostKeyCallback,
+				Clock:           h.c.Clock.Now,
+			},
+			FIPS: h.c.FIPS,
+		}
+		err := certChecker.CheckHostKey(addr, remote, key)
+		if err != nil {
+			return trace.Wrap(err)
+		}
+
+		// Perform RBAC checks if the node is a registered OpenSSH node
+		// TODO: check if node is registered OpenSSH node by what CA signed
+		// the cert
+		hostCert, ok := key.(*ssh.Certificate)
+		if !ok {
+			h.log.Debug("not a host cert")
+			return nil
+		}
+		role, ok := hostCert.Permissions.Extensions[utils.CertExtensionRole]
+		if !ok || role != string(types.RoleOpenSSHNode) {
+			h.log.Debugf("not registered OpenSSH node: %v", role)
+			return nil
+		}
+		if len(hostCert.ValidPrincipals) == 0 {
+			return trace.BadParameter("host certificate has no principles")
+		}
+
+		// Attempt to lookup a node by it's hostname. If we can find one,
+		// preform RBAC checks on it. If not, return an error.
+		// TODO: move this to UserKeyAuth once the OpenSSH CA is added
+		// TODO: do this without locally searching through all nodes in a namespace?
+		// TODO: is using the Server's namespace the right thing to do here?
+		nodes, err := h.c.AccessPoint.GetNodes(context.Background(), h.c.Server.GetNamespace())
+		if err != nil {
+			return trace.Wrap(err)
+		}
+		var targetNode types.Server
+		for _, node := range nodes {
+			if slices.Contains(hostCert.ValidPrincipals, node.GetHostname()) {
+				targetNode = node
+				break
+			}
+		}
+		if targetNode == nil {
+			return trace.NotFound("node %v not found", hostCert.ValidPrincipals[0])
+		}
+
+		clusterName, err := h.c.AccessPoint.GetClusterName()
+		if err != nil {
+			return trace.Wrap(err)
+		}
+		err = h.canLoginWithRBAC(
+			identityCtx.Certificate,
+			targetNode,
+			clusterName.GetClusterName(),
+			identityCtx.TeleportUser,
+			identityCtx.Login,
+		)
+		if err != nil {
+			return trace.Wrap(err)
+		}
+
+		return nil
 	}
-	err := certChecker.CheckHostKey(addr, remote, key)
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	return nil
 }
 
 // hostKeyCallback allows connections to hosts that present keys only if
@@ -537,13 +599,13 @@ func (h *AuthHandlers) canLoginWithoutRBAC(cert *ssh.Certificate, clusterName st
 // canLoginWithRBAC checks the given certificate (supplied by a connected
 // client) to see if this certificate can be allowed to login as user:login
 // pair to requested server and if RBAC rules allow login.
-func (h *AuthHandlers) canLoginWithRBAC(cert *ssh.Certificate, clusterName string, teleportUser, osUser string) error {
+func (h *AuthHandlers) canLoginWithRBAC(cert *ssh.Certificate, node types.Server, clusterName, teleportUser, osUser string) error {
 	// Use the server's shutdown context.
 	ctx := h.c.Server.Context()
 
 	h.log.Debugf("Checking permissions for (%v,%v) to login to node with RBAC checks.", teleportUser, osUser)
 
-	// get the ca that signd the users certificate
+	// get the ca that signed the users certificate
 	ca, err := h.authorityForCert(types.UserCA, cert.SignatureKey)
 	if err != nil {
 		return trace.Wrap(err)
@@ -573,7 +635,7 @@ func (h *AuthHandlers) canLoginWithRBAC(cert *ssh.Certificate, clusterName strin
 
 	// check if roles allow access to server
 	if err := accessChecker.CheckAccess(
-		h.c.Server.GetInfo(),
+		node,
 		mfaParams,
 		services.NewLoginMatcher(osUser),
 	); err != nil {

@@ -624,7 +624,7 @@ func (s *Server) newRemoteClient(ctx context.Context, systemLogin string) (*trac
 		Auth: []ssh.AuthMethod{
 			authMethod,
 		},
-		HostKeyCallback: s.authHandlers.HostKeyAuth,
+		HostKeyCallback: s.authHandlers.NewHostKeyAuth(s.identityContext),
 		Timeout:         apidefaults.DefaultDialTimeout,
 	}
 
@@ -643,7 +643,6 @@ func (s *Server) newRemoteClient(ctx context.Context, systemLogin string) (*trac
 		return nil, trace.Wrap(err)
 	}
 	return client, nil
-
 }
 
 // signersWithSHA1Fallback returns the signers provided by signersCb and appends

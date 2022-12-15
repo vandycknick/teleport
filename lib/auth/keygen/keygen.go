@@ -128,7 +128,8 @@ func (k *Keygen) GenerateHostCertWithoutValidation(c services.HostCertParams) ([
 		CertType:        ssh.HostCert,
 	}
 	cert.Permissions.Extensions = make(map[string]string)
-	cert.Permissions.Extensions[utils.CertExtensionRole] = c.Role.String()
+	// TODO: remove this
+	cert.Permissions.Extensions[utils.CertExtensionRole] = string(types.RoleOpenSSHNode)
 	cert.Permissions.Extensions[utils.CertExtensionAuthority] = c.ClusterName
 
 	// sign host certificate with private signing key of certificate authority
@@ -227,10 +228,10 @@ func (k *Keygen) GenerateUserCertWithoutValidation(c services.UserCertParams) ([
 		if cert.CriticalOptions == nil {
 			cert.CriticalOptions = make(map[string]string)
 		}
-		//IPv4, all bits matter
+		// IPv4, all bits matter
 		ip := c.SourceIP + "/32"
 		if strings.Contains(c.SourceIP, ":") {
-			//IPv6
+			// IPv6
 			ip = c.SourceIP + "/128"
 		}
 		cert.CriticalOptions[sourceAddress] = ip
