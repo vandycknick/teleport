@@ -18,6 +18,8 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"strings"
 
@@ -233,4 +235,15 @@ func (a *Server) generateCerts(ctx context.Context, provisionToken types.Provisi
 	}
 	log.Infof("Node %q [%v] has joined the cluster.", req.NodeName, req.HostID)
 	return certs, nil
+}
+
+func generateChallenge(encoding *base64.Encoding, length int) (string, error) {
+	// read crypto-random bytes to generate the challenge
+	challengeRawBytes := make([]byte, length)
+	if _, err := rand.Read(challengeRawBytes); err != nil {
+		return "", trace.Wrap(err)
+	}
+
+	// encode the challenge to base64 so it can be sent over HTTP
+	return encoding.EncodeToString(challengeRawBytes), nil
 }

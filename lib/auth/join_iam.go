@@ -20,7 +20,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"io"
@@ -333,15 +332,9 @@ func (a *Server) checkIAMRequest(ctx context.Context, challenge string, req *pro
 	return nil
 }
 
-func generateChallenge() (string, error) {
-	// read 32 crypto-random bytes to generate the challenge
-	challengeRawBytes := make([]byte, 32)
-	if _, err := rand.Read(challengeRawBytes); err != nil {
-		return "", trace.Wrap(err)
-	}
-
-	// encode the challenge to base64 so it can be sent in an HTTP header
-	return base64.RawStdEncoding.EncodeToString(challengeRawBytes), nil
+func generateIAMChallenge() (string, error) {
+	challenge, err := generateChallenge(base64.RawStdEncoding, 32)
+	return challenge, trace.Wrap(err)
 }
 
 type iamRegisterConfig struct {
@@ -387,7 +380,7 @@ func (a *Server) RegisterUsingIAMMethod(ctx context.Context, challengeResponse c
 		return nil, trace.BadParameter("logic error: client address was not set")
 	}
 
-	challenge, err := generateChallenge()
+	challenge, err := generateIAMChallenge()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
