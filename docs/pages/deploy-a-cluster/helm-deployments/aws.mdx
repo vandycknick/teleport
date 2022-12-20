@@ -411,18 +411,24 @@ Once the chart is installed, you can use `kubectl` commands to view the deployme
 ```code
 $ kubectl --namespace teleport get all
 
-# NAME                            READY   STATUS    RESTARTS   AGE
-# pod/teleport-5cf46ddf5f-dzh65   1/1     Running   0          4m21s
-# pod/teleport-5cf46ddf5f-mpghq   1/1     Running   0          4m21s
-
-# NAME               TYPE           CLUSTER-IP      EXTERNAL-IP                                                               PORT(S)                                                      AGE
-# service/teleport   LoadBalancer   10.100.37.171   a232d92df01f940339adea0e645d88bb-1576732600.us-east-1.elb.amazonaws.com   443:30821/TCP,3023:30801/TCP,3026:32612/TCP,3024:31253/TCP   4m21s
-
-# NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
-# deployment.apps/teleport   2/2     2            2           4m21s
-
-# NAME                                  DESIRED   CURRENT   READY   AGE
-# replicaset.apps/teleport-5cf46ddf5f   2         2         2       4m21s
+# NAME                                  READY   STATUS    RESTARTS   AGE
+# pod/teleport-auth-0                   1/1     Running   0          6d20h
+# pod/teleport-auth-1                   1/1     Running   0          6d20h
+# pod/teleport-proxy-69c9c4c986-j9v2j   1/1     Running   0          6d20h
+# pod/teleport-proxy-69c9c4c986-qhh5f   1/1     Running   0          6d20h
+#
+# NAME                        TYPE           CLUSTER-IP       EXTERNAL-IP                                                                     PORT(S)                                                                     AGE
+# service/teleport            LoadBalancer   10.100.12.107    a546730f242924b339067066e3bbed18-fe686ba37fb0f9cb.elb.us-east-1.amazonaws.com   443:31566/TCP,3023:30732/TCP,3026:30594/TCP,3024:30270/TCP,3036:31302/TCP   6d21h
+# service/teleport-auth       ClusterIP      10.100.230.247   <none>                                                                          3025/TCP,3026/TCP                                                           6d20h
+#
+# NAME                             READY   UP-TO-DATE   AVAILABLE   AGE
+# deployment.apps/teleport-proxy   2/2     2            2           6d20h
+#
+# NAME                                        DESIRED   CURRENT   READY   AGE
+# replicaset.apps/teleport-proxy-69c9c4c986   2         2         2       6d20h
+#
+# NAME                             READY   AGE
+# statefulset.apps/teleport-auth   2/2     6d20h
 ```
 
 ## Step 6/7. Set up DNS
@@ -499,7 +505,7 @@ Create a user to be able to log into Teleport. This needs to be done on the Tele
 so we can run the command using `kubectl`:
 
 ```code
-$ kubectl --namespace teleport exec deploy/teleport -- tctl users add test --roles=access,editor
+$ kubectl --namespace teleport exec statefulset/teleport-auth -- tctl users add test --roles=access,editor
 # User "test" has been created but requires a password. Share this URL with the user to complete user setup, link is valid for 1h:
 # https://teleport.example.com:443/web/invite/91cfbd08bc89122275006e48b516cc68
 
