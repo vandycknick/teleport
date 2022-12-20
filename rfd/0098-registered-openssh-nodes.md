@@ -21,25 +21,13 @@ Allow OpenSSH nodes to be registered in a Teleport cluster.
 
 ## Details
 
-### Agentless CA
-
-For security related reasons that will be discussed below, a new CA will be added called Agentless CA. The Agentless CA will be responsible for generating and signing user certificates that will be used to authenticate with registered OpenSSH nodes. The Agentless CA will not be used to generate certificates for existing or future *unregistered* OpenSSH nodes, preserving backwards compatibility for existing OpenSSH nodes.
-
-### RBAC
-
-When OpenSSH nodes are registered currently, RBAC checks for those nodes are not preformed. RBAC logic will have to be updated so RBAC checks for registered OpenSSH nodes are preformed.
-
-When `(lib/srv.AuthHandlers).UserKeyAuth` is called to authenticate a node's user certificate, it will check what CA signed the certificate. If the Agentless CA signed the certificate, the node will be recognized as a registered OpenSSH node. `UserKeyAuth` will lookup the node's details and preform an RBAC check.
-
 ### Registering nodes
 
-A new sub-kind to the `node` resource will be added for registered OpenSSH nodes: `openssh`. The absence of a `node` resource sub-kind will imply that a node is a Teleport agent node, making this change backwards compatible.
+A new sub-kind to the `node` resource will be added for registered OpenSSH nodes: `agentless`. The absence of a `node` resource sub-kind will imply that a node is a Teleport agent node, making this change backwards compatible.
 
 #### Registering with `tctl`
 
-OpenSSH nodes can already be manually registered using `tctl create --force /path/to/node.yml`, though some changes should be made to make the process more straightforward for users. Agentless EC2 discovery mode will registered discovered OpenSSH nodes without needing user intervention, but if automatically registering an OpenSSH node fails a user may want to register a node manually. Currently nodes cannot be created with `tctl`, only upserted. This limitation should be removed so users can create nodes without having to pass `--force` to `tctl create`.
-
-Furthermore, `tctl` should not require as many fields to be set when creating nodes. This is an example `node` resource that will work with `tctl create` today:
+`tctl` should not require as many fields to be set when creating nodes. This is an example `node` resource that will work with `tctl create --force` today:
 
 ```yaml
 kind: node
@@ -51,7 +39,47 @@ spec:
 version: v2
 ```
 
-`tctl create` will auto-generate `metadata.name` if it is not already set so users don't have to generate GUIDs themselves. Also, if `sub_kind` is set to `openssh`, `spec.public_addr` will not be allowed for registered OpenSSH nodes as it is not needed.
+`tctl` will auto-generate `metadata.name` if it is not already set so users don't have to generate GUIDs themselves if `sub_kind` is `agentless`. Also, if `sub_kind` is set to `agentless`, `spec.public_addr` will not be allowed for registered OpenSSH nodes as it is not needed.
+
+### Agentless CA
+
+For security related reasons that will be discussed below, a new CA will be added called Agentless CA. The Agentless CA will be responsible for generating and signing user certificates that will be used to authenticate with registered OpenSSH nodes. The public key of the Agentless CA will be copied to all registered OpenSSH nodes and configured as `TrustedUserCAKeys` in `sshd_config`.
+
+### RBAC
+
+When OpenSSH nodes are registered currently, RBAC checks for those nodes are not preformed. RBAC logic will have to be updated so RBAC checks for registered OpenSSH nodes are preformed. There are multiple ways to implement this, each with their own advantages and disadvantages.
+
+#### Option 1
+
+Each registered OpenSSH node will have a unique Agentless CA. The CA public key will include information about the node that it was created for, including the unique node name and the node's labels. When `(lib/srv.AuthHandlers).UserKeyAuth` is called to authenticate a node's user certificate, it will check if node information is present in the CA public key. If node information is present, an RBAC check will be preformed using the label information in the CA public key.
+
+Pros:
+
+- No need to lookup node resources to preform RBAC checks
+
+Cons:
+
+- Requires connecting to node to preform RBAC check
+- Updating node labels requires generating and distributing a new host key
+- CA rotation is more complex as every registered OpenSSH node requires a unique CA
+
+#### Option 2
+
+When a user sends a request to a Proxy to connect to a node, the Proxy will attempt to find a node resource by either its hostname or address, whichever the user specified. If the resource exists and has the `agentless` `sub_kind`, an RBAC check will be preformed. If the resource does not exist or isn't an `agentless` node, the connection flow will continue as normal.
+
+Pros:
+
+- No need to connect to node to preform RBAC check
+- Updating node labels can simply be done in DB
+- CA rotation is simple as every registered OpenSSH node will have the same CA
+
+Cons:
+
+- Node resources must be looked up before every node connection
+
+#### My choice: Option 2
+
+Option 2 makes CA rotation and updating node labels much easier, and has the only downside of having to search for node resources before connecting to one. 
 
 ### Security
 
@@ -68,6 +96,8 @@ The following Teleport node features won't work with registered OpenSSH nodes:
 - Session recording without SSH session termination
 - Dynamic labels
 - Outbound persistent tunnels to Proxies
+
+Due to this and other potential future differences, `tsh ls` and the node listing on the web UI should be updated to display if nodes are registered OpenSSH nodes, or simply 'agentless'.
 
 ### Future work
 
