@@ -47,29 +47,29 @@ For security related reasons that will be discussed below, a new CA will be adde
 
 ### RBAC
 
-When OpenSSH nodes are registered currently, RBAC checks for those nodes are not preformed. RBAC logic will have to be updated so RBAC checks for registered OpenSSH nodes are preformed. There are multiple ways to implement this, each with their own advantages and disadvantages.
+When OpenSSH nodes are registered currently, RBAC checks for those nodes are not performed. RBAC logic will have to be updated so RBAC checks for registered OpenSSH nodes are performed. There are multiple ways to implement this, each with their own advantages and disadvantages.
 
 #### Option 1
 
-Each registered OpenSSH node will have a unique Agentless CA. The CA public key will include information about the node that it was created for, including the node's UUID and the node's labels. When `(lib/srv.AuthHandlers).UserKeyAuth` is called to authenticate a node's user certificate, it will check if node information is present in the CA public key. If node information is present, an RBAC check will be preformed using the label information in the CA public key.
+Each registered OpenSSH node will have a unique Agentless CA. The CA public key will include information about the node that it was created for, including the node's UUID and the node's labels. When `(lib/srv.AuthHandlers).UserKeyAuth` is called to authenticate a node's user certificate, it will check if node information is present in the CA public key. If node information is present, an RBAC check will be performed using the label information in the CA public key.
 
 Pros:
 
-- No need to lookup node resources to preform RBAC checks
+- No need to lookup node resources to perform RBAC checks
 
 Cons:
 
-- Requires connecting to node to preform RBAC check
+- Requires connecting to node to perform RBAC check
 - Updating node labels requires generating and distributing a new host key
 - CA rotation is more complex as every registered OpenSSH node requires a unique CA
 
 #### Option 2
 
-When a user sends a request to a Proxy to connect to a node, the Proxy will attempt to find a node resource by either its hostname or IP, whichever the user specified. If the resource exists and has the `agentless` `sub_kind`, an RBAC check will be preformed. If the resource does not exist or isn't an `agentless` node, the connection flow will continue as normal.
+When a user sends a request to a Proxy to connect to a node, the Proxy will attempt to find a node resource by either its hostname or IP, whichever the user specified. If the resource exists and has the `agentless` `sub_kind`, an RBAC check will be performed. If the resource does not exist or isn't an `agentless` node, the connection flow will continue as normal.
 
 Pros:
 
-- No need to connect to node to preform RBAC check
+- No need to connect to node to perform RBAC check
 - Updating node labels can simply be done by using `tctl`
 - CA rotation is simple as every registered OpenSSH node will have the same CA
 
