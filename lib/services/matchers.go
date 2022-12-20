@@ -29,6 +29,17 @@ type ResourceMatcher struct {
 	Labels types.Labels
 }
 
+// ResourceMatchersToTypes converts a list of services.ResourceMatchers into a list of *types.ResourceMatcher
+func ResourceMatchersToTypes(in []ResourceMatcher) []*types.DatabaseResourceMatcher {
+	out := make([]*types.DatabaseResourceMatcher, len(in))
+	for i, resMatcher := range in {
+		out[i] = &types.DatabaseResourceMatcher{
+			Labels: &resMatcher.Labels,
+		}
+	}
+	return out
+}
+
 // AWSSSM provides options to use when executing SSM documents
 type AWSSSM struct {
 	// DocumentName is the name of the document to use when executing an

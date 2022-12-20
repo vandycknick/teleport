@@ -78,6 +78,7 @@ type testPack struct {
 	apps              services.Apps
 	kubernetes        services.Kubernetes
 	databases         services.Databases
+	databaseServices  services.DatabaseServices
 	webSessionS       types.WebSessionInterface
 	webTokenS         types.WebTokenInterface
 	windowsDesktops   services.WindowsDesktops
@@ -193,6 +194,7 @@ func newPackWithoutCache(dir string, opts ...packOption) (*testPack, error) {
 	p.apps = local.NewAppService(p.backend)
 	p.kubernetes = local.NewKubernetesService(p.backend)
 	p.databases = local.NewDatabasesService(p.backend)
+	p.databaseServices = local.NewDatabaseServicesService(p.backend)
 	p.windowsDesktops = local.NewWindowsDesktopService(p.backend)
 
 	return p, nil
@@ -224,6 +226,7 @@ func newPack(dir string, setupConfig func(c Config) Config, opts ...packOption) 
 		Restrictions:     p.restrictions,
 		Apps:             p.apps,
 		Kubernetes:       p.kubernetes,
+		DatabaseServices: p.databaseServices,
 		Databases:        p.databases,
 		WindowsDesktops:  p.windowsDesktops,
 		MaxRetryPeriod:   200 * time.Millisecond,
@@ -418,23 +421,24 @@ func TestNodeCAFiltering(t *testing.T) {
 
 	// this mimics a cache for a node pulling events from the auth server via WatchEvents
 	nodeCache, err := New(ForNode(Config{
-		Events:          p.cache,
-		Trust:           p.cache.trustCache,
-		ClusterConfig:   p.cache.clusterConfigCache,
-		Provisioner:     p.cache.provisionerCache,
-		Users:           p.cache.usersCache,
-		Access:          p.cache.accessCache,
-		DynamicAccess:   p.cache.dynamicAccessCache,
-		Presence:        p.cache.presenceCache,
-		Restrictions:    p.cache.restrictionsCache,
-		Apps:            p.cache.appsCache,
-		Kubernetes:      p.cache.kubernetesCache,
-		Databases:       p.cache.databasesCache,
-		AppSession:      p.cache.appSessionCache,
-		WebSession:      p.cache.webSessionCache,
-		WebToken:        p.cache.webTokenCache,
-		WindowsDesktops: p.cache.windowsDesktopsCache,
-		Backend:         nodeCacheBackend,
+		Events:           p.cache,
+		Trust:            p.cache.trustCache,
+		ClusterConfig:    p.cache.clusterConfigCache,
+		Provisioner:      p.cache.provisionerCache,
+		Users:            p.cache.usersCache,
+		Access:           p.cache.accessCache,
+		DynamicAccess:    p.cache.dynamicAccessCache,
+		Presence:         p.cache.presenceCache,
+		Restrictions:     p.cache.restrictionsCache,
+		Apps:             p.cache.appsCache,
+		Kubernetes:       p.cache.kubernetesCache,
+		Databases:        p.cache.databasesCache,
+		DatabaseServices: p.cache.databaseServicesCache,
+		AppSession:       p.cache.appSessionCache,
+		WebSession:       p.cache.webSessionCache,
+		WebToken:         p.cache.webTokenCache,
+		WindowsDesktops:  p.cache.windowsDesktopsCache,
+		Backend:          nodeCacheBackend,
 	}))
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, nodeCache.Close()) })
@@ -603,6 +607,7 @@ func TestCompletenessInit(t *testing.T) {
 			Restrictions:     p.restrictions,
 			Apps:             p.apps,
 			Kubernetes:       p.kubernetes,
+			DatabaseServices: p.databaseServices,
 			Databases:        p.databases,
 			WindowsDesktops:  p.windowsDesktops,
 			MaxRetryPeriod:   200 * time.Millisecond,
@@ -665,6 +670,7 @@ func TestCompletenessReset(t *testing.T) {
 		Restrictions:     p.restrictions,
 		Apps:             p.apps,
 		Kubernetes:       p.kubernetes,
+		DatabaseServices: p.databaseServices,
 		Databases:        p.databases,
 		WindowsDesktops:  p.windowsDesktops,
 		MaxRetryPeriod:   200 * time.Millisecond,
@@ -839,6 +845,7 @@ func TestListResources_NodesTTLVariant(t *testing.T) {
 		Restrictions:     p.restrictions,
 		Apps:             p.apps,
 		Kubernetes:       p.kubernetes,
+		DatabaseServices: p.databaseServices,
 		Databases:        p.databases,
 		WindowsDesktops:  p.windowsDesktops,
 		MaxRetryPeriod:   200 * time.Millisecond,
@@ -911,6 +918,7 @@ func initStrategy(t *testing.T) {
 		Restrictions:     p.restrictions,
 		Apps:             p.apps,
 		Kubernetes:       p.kubernetes,
+		DatabaseServices: p.databaseServices,
 		Databases:        p.databases,
 		WindowsDesktops:  p.windowsDesktops,
 		MaxRetryPeriod:   200 * time.Millisecond,
@@ -2606,6 +2614,7 @@ func TestCacheWatchKindExistsInEvents(t *testing.T) {
 		types.KindRemoteCluster:           &types.RemoteClusterV3{},
 		types.KindKubeService:             &types.ServerV2{},
 		types.KindKubeServer:              &types.KubernetesServerV3{},
+		types.KindDatabaseService:         &types.DatabaseServiceV1{},
 		types.KindDatabaseServer:          &types.DatabaseServerV3{},
 		types.KindDatabase:                &types.DatabaseV3{},
 		types.KindNetworkRestrictions:     &types.NetworkRestrictionsV4{},

@@ -405,6 +405,10 @@ func (f *fakeAnnouncer) UpdateWindowsDesktop(ctx context.Context, s types.Window
 	return f.err
 }
 
+func (f *fakeAnnouncer) UpsertDatabaseService(ctx context.Context, s types.DatabaseService) (*types.KeepAlive, error) {
+	f.upsertCalls[HeartbeatModeDatabaseService]++
+	return nil, f.err
+}
 func (f *fakeAnnouncer) NewKeepAliver(ctx context.Context) (types.KeepAliver, error) {
 	return f, f.err
 }

@@ -116,6 +116,8 @@ message Event {
     types.KubernetesClusterV3 KubernetesCluster = 33 [(gogoproto.jsontag) = "kubernetes_cluster,omitempty"];
     // Installer is an installer resource
     types.InstallerV1 Installer = 34 [(gogoproto.jsontag) = "installer,omitempty"];
+    // DatabaseService is a DatabaseService resource
+    types.DatabaseServiceV1 DatabaseService = 35 [(gogoproto.jsontag) = "database_service,omitempty"];
   }
 }
 
@@ -2213,7 +2215,7 @@ service AuthService {
   rpc DeleteAllDatabaseServers(DeleteAllDatabaseServersRequest) returns (google.protobuf.Empty);
 
   // UpsertDatabaseService registers a new DatabaseService.
-  rpc UpsertDatabaseService(UpsertDatabaseServiceRequest) returns (google.protobuf.Empty);
+  rpc UpsertDatabaseService(UpsertDatabaseServiceRequest) returns (types.KeepAlive);
   // DeleteDatabaseService removes the specified DatabaseService.
   rpc DeleteDatabaseService(types.ResourceRequest) returns (google.protobuf.Empty);
   // DeleteAllDatabaseServices removes all registered DatabaseServices.

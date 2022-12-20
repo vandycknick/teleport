@@ -61,6 +61,7 @@ var DefaultImplicitRules = []types.Rule{
 	types.NewRule(types.KindKubeService, RO()),
 	types.NewRule(types.KindKubeServer, RO()),
 	types.NewRule(types.KindDatabaseServer, RO()),
+	types.NewRule(types.KindDatabaseService, RO()),
 	types.NewRule(types.KindDatabase, RO()),
 	types.NewRule(types.KindApp, RO()),
 	types.NewRule(types.KindWindowsDesktopService, RO()),
