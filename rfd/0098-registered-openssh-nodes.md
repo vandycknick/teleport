@@ -21,15 +21,15 @@ Allow OpenSSH nodes to be registered in a Teleport cluster.
 
 ## Details
 
-### OpenSSH CA
+### Agentless CA
 
-For security related reasons that will be discussed below, a new CA will be added called OpenSSH CA. The OpenSSH CA will be responsible for generating and signing user certificates that will be used to authenticate with registered OpenSSH nodes. The OpenSSH CA will not be used to generate certificates for existing or future *unregistered* OpenSSH nodes, preserving backwards compatibility for existing OpenSSH nodes.
+For security related reasons that will be discussed below, a new CA will be added called Agentless CA. The Agentless CA will be responsible for generating and signing user certificates that will be used to authenticate with registered OpenSSH nodes. The Agentless CA will not be used to generate certificates for existing or future *unregistered* OpenSSH nodes, preserving backwards compatibility for existing OpenSSH nodes.
 
 ### RBAC
 
-When OpenSSH nodes are registered currently, RBAC checks for those nodes are not preformed. Even setting `auth_service.session_recording` to `proxy` in an Auth Server's config file does not help. RBAC logic will have to be updated so RBAC checks for registered OpenSSH nodes are preformed.
+When OpenSSH nodes are registered currently, RBAC checks for those nodes are not preformed. RBAC logic will have to be updated so RBAC checks for registered OpenSSH nodes are preformed.
 
-When `(lib/srv.AuthHandlers).UserKeyAuth` is called to authenticate a node's user certificate, it will check what CA signed the certificate. If the OpenSSH CA signed the certificate, the node will be recognized as a registered OpenSSH node. `UserKeyAuth` will lookup the node's details and preform an RBAC check.
+When `(lib/srv.AuthHandlers).UserKeyAuth` is called to authenticate a node's user certificate, it will check what CA signed the certificate. If the Agentless CA signed the certificate, the node will be recognized as a registered OpenSSH node. `UserKeyAuth` will lookup the node's details and preform an RBAC check.
 
 ### Registering nodes
 
@@ -53,26 +53,11 @@ version: v2
 
 `tctl create` will auto-generate `metadata.name` if it is not already set so users don't have to generate GUIDs themselves. Also, if `sub_kind` is set to `openssh`, `spec.public_addr` will not be allowed for registered OpenSSH nodes as it is not needed.
 
-### Session recording
-
-Currently session recording is required to be set be in `proxy` mode to work with OpenSSH nodes. That is not going to change, but ideally this requirement could be lifted when Teleport agent nodes and registered OpenSSH nodes are both in a single cluster. When establishing an SSH connection inside a cluster, depending on what the session recording mode is set to the appropriate type of session recording would be used:
-
-If session recording is in `node` or `node-sync` mode:
-
-- If the node is a Teleport Agent node, the node would record the session and upload it as normal.
-- If the node is a registered OpenSSH node, the Proxy would terminate and record the SSH session and upload it.
-
-If session recording is in `proxy` or `proxy-sync` mode:
-
-- Behavior would be unaffected. The Proxy would terminate, record and upload the session. This mode will still be required if users of a cluster wish to connect to unregistered OpenSSH nodes.
-
-I propose that `proxy` or `proxy-sync` session recording modes continue to be required when connecting to any OpenSSH node through Teleport, *at first*. When registering OpenSSH nodes and preforming RBAC checks on them is completed and possibly released, then work could be done to streamline session recording with registered OpenSSH nodes.
-
 ### Security
 
 Both RBAC checks and session recording for registered OpenSSH nodes require that users connect through a Proxy. If users are able to connect to registered OpenSSH nodes directly, they can bypass both features. Currently the User CA public key is copied to OpenSSH nodes and configured to be trusted by `sshd`. This means OpenSSH nodes will accept certificates that are signed by the User CA. The problem with that is when Teleport users authenticate with a cluster, the Auth server replies with a certificate that is signed by the User CA. Users could potentially use this certificate to directly connect to registered OpenSSH nodes.
 
-Using the new OpenSSH CA to sign certificates used to authenticate with registered OpenSSH nodes solves this problem, as Teleport users do not have access to any certificates signed by the OpenSSH CA.
+Using the new Agentless CA to sign certificates used to authenticate with registered OpenSSH nodes solves this problem, as Teleport users do not have access to any certificates signed by the Agentless CA.
 
 ### UX
 
@@ -86,4 +71,15 @@ The following Teleport node features won't work with registered OpenSSH nodes:
 
 ### Future work
 
-The OpenSSH CA could be also used to sign certificates for non-registered OpenSSH nodes. If that is done then the same logic could be used to detect non-registered OpenSSH nodes, possibly lifting the 
+#### Session recording
+
+Currently session recording is required to be set be in `proxy` mode to work with OpenSSH nodes. That is not going to change, but ideally this requirement could be lifted when Teleport agent nodes and registered OpenSSH nodes are both in a single cluster. When establishing an SSH connection inside a cluster, depending on what the session recording mode is set to the appropriate type of session recording would be used:
+
+If session recording is in `node` or `node-sync` mode:
+
+- If the node is a Teleport Agent node, the node would record the session and upload it as normal.
+- If the node is a registered OpenSSH node, the Proxy would terminate and record the SSH session and upload it.
+
+If session recording is in `proxy` or `proxy-sync` mode:
+
+- Behavior would be unaffected. The Proxy would terminate, record and upload the session. This mode will still be required if users of a cluster wish to connect to unregistered OpenSSH nodes.
