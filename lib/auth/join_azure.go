@@ -79,9 +79,9 @@ type vmInfo struct {
 type azureVerifyTokenFunc func(ctx context.Context, rawIDToken string) (*accessTokenClaims, error)
 
 type azureRegisterConfig struct {
-	clock    clockwork.Clock
-	certPool *x509.CertPool
-	verify   azureVerifyTokenFunc
+	clock  clockwork.Clock
+	certs  []*x509.Certificate
+	verify azureVerifyTokenFunc
 }
 
 func verifyFuncFromOIDCVerifier(verifier *oidc.IDTokenVerifier) azureVerifyTokenFunc {
@@ -112,14 +112,22 @@ func (cfg *azureRegisterConfig) CheckAndSetDefaults(ctx context.Context) error {
 		}
 		cfg.verify = verifyFuncFromOIDCVerifier(provider.Verifier(oidcConfig))
 	}
+
+	if cfg.certs == nil {
+		certs, err := getAzureCerts()
+		if err != nil {
+			return trace.Wrap(err)
+		}
+		cfg.certs = certs
+	}
 	return nil
 }
 
 type azureRegisterOption func(cfg *azureRegisterConfig)
 
-func withCertPool(pool *x509.CertPool) azureRegisterOption {
+func withCerts(certs []*x509.Certificate) azureRegisterOption {
 	return func(cfg *azureRegisterConfig) {
-		cfg.certPool = pool
+		cfg.certs = certs
 	}
 }
 
@@ -133,7 +141,7 @@ func withVerifyFunc(verify azureVerifyTokenFunc) azureRegisterOption {
 // by Azure.
 //
 // If certPool is nil, the system cert pool will be used.
-func parseAndVerifyAttestedData(adBytes []byte, challenge string, certPool *x509.CertPool) error {
+func parseAndVerifyAttestedData(adBytes []byte, challenge string, certs []*x509.Certificate) error {
 	var signedAD signedAttestedData
 	if err := json.Unmarshal(adBytes, &signedAD); err != nil {
 		return trace.Wrap(err)
@@ -153,14 +161,8 @@ func parseAndVerifyAttestedData(adBytes []byte, challenge string, certPool *x509
 		return trace.Wrap(err)
 	}
 
-	if certPool == nil {
-		certPool, err = x509.SystemCertPool()
-		if err != nil {
-			return trace.Wrap(err)
-		}
-	}
-
-	if err := p7.VerifyWithChain(certPool); err != nil {
+	p7.Certificates = certs
+	if err := p7.Verify(); err != nil {
 		return trace.Wrap(err)
 	}
 
@@ -204,7 +206,7 @@ func (a *Server) checkAzureRequest(ctx context.Context, challenge string, req *p
 		return trace.AccessDenied("this token does not support the Azure join method")
 	}
 
-	if err := parseAndVerifyAttestedData(req.AttestedData, challenge, cfg.certPool); err != nil {
+	if err := parseAndVerifyAttestedData(req.AttestedData, challenge, cfg.certs); err != nil {
 		return trace.Wrap(err)
 	}
 

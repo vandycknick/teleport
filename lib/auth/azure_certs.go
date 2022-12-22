@@ -16,10 +16,30 @@ limitations under the License.
 
 package auth
 
+import (
+	"crypto/x509"
+	"encoding/pem"
+
+	"github.com/gravitational/trace"
+)
+
+func getAzureCerts() ([]*x509.Certificate, error) {
+	var certs []*x509.Certificate
+	for _, certBytes := range rawAzureCerts {
+		certPEM, _ := pem.Decode(certBytes)
+		cert, err := x509.ParseCertificate(certPEM.Bytes)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		certs = append(certs, cert)
+	}
+	return certs, nil
+}
+
 // These certificates can be found at
 // https://learn.microsoft.com/en-us/azure/security/fundamentals/azure-ca-details.
 // Pinned on 2022-12-22.
-var azureCerts = [][]byte{
+var rawAzureCerts = [][]byte{
 	// DigiCert Basic RSA CN CA G2
 	[]byte(`-----BEGIN CERTIFICATE-----
 MIIFFTCCA/2gAwIBAgIQAvfh+YK60Amv9H3JV0Gy9jANBgkqhkiG9w0BAQsFADBh

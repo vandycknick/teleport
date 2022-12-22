@@ -145,7 +145,7 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 		tokenSpec                types.ProvisionTokenSpecV2
 		challengeResponseOptions []azureChallengeResponseOption
 		challengeResponseErr     error
-		useSystemCertPool        bool
+		certs                    []*x509.Certificate
 		verify                   azureVerifyTokenFunc
 		assertError              require.ErrorAssertionFunc
 	}{
@@ -168,6 +168,7 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 				JoinMethod: types.JoinMethodAzure,
 			},
 			verify:      mockVerifyToken(nil),
+			certs:       []*x509.Certificate{tlsConfig.Certificate},
 			assertError: require.NoError,
 		},
 		{
@@ -188,6 +189,7 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 				JoinMethod: types.JoinMethodAzure,
 			},
 			verify:      mockVerifyToken(nil),
+			certs:       []*x509.Certificate{tlsConfig.Certificate},
 			assertError: isAccessDenied,
 		},
 		{
@@ -208,6 +210,7 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 				JoinMethod: types.JoinMethodAzure,
 			},
 			verify:               mockVerifyToken(nil),
+			certs:                []*x509.Certificate{tlsConfig.Certificate},
 			challengeResponseErr: trace.BadParameter("test error"),
 			assertError:          isBadParameter,
 		},
@@ -229,6 +232,7 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 				JoinMethod: types.JoinMethodAzure,
 			},
 			verify:      mockVerifyToken(nil),
+			certs:       []*x509.Certificate{tlsConfig.Certificate},
 			assertError: isAccessDenied,
 		},
 		{
@@ -250,6 +254,7 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 				JoinMethod: types.JoinMethodAzure,
 			},
 			verify:      mockVerifyToken(nil),
+			certs:       []*x509.Certificate{tlsConfig.Certificate},
 			assertError: isAccessDenied,
 		},
 		{
@@ -273,6 +278,7 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 				withChallengeAzure("wrong-challenge"),
 			},
 			verify:      mockVerifyToken(nil),
+			certs:       []*x509.Certificate{tlsConfig.Certificate},
 			assertError: isAccessDenied,
 		},
 		{
@@ -292,9 +298,9 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 				},
 				JoinMethod: types.JoinMethodAzure,
 			},
-			verify:            mockVerifyToken(nil),
-			useSystemCertPool: true,
-			assertError:       require.Error,
+			verify:      mockVerifyToken(nil),
+			certs:       []*x509.Certificate{},
+			assertError: require.Error,
 		},
 	}
 
@@ -315,11 +321,6 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 
 			reqCtx := context.Background()
 			reqCtx = context.WithValue(reqCtx, ContextClientAddr, &net.IPAddr{})
-
-			var certPool *x509.CertPool
-			if !tc.useSystemCertPool {
-				certPool = tlsConfig.CertPool
-			}
 
 			_, err = a.RegisterUsingAzureMethod(reqCtx, func(challenge string) (*proto.RegisterUsingAzureMethodRequest, error) {
 				cfg := &azureChallengeResponseConfig{Challenge: challenge}
@@ -357,7 +358,7 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 					AccessToken:  accessToken,
 				}
 				return req, tc.challengeResponseErr
-			}, withCertPool(certPool), withVerifyFunc(tc.verify))
+			}, withCerts(tc.certs), withVerifyFunc(tc.verify))
 			tc.assertError(t, err)
 		})
 	}
