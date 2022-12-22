@@ -116,10 +116,15 @@ func (h *Handler) upsertRoleHandle(w http.ResponseWriter, r *http.Request, param
 		return nil, trace.Wrap(err)
 	}
 
-	return upsertRole(r.Context(), clt, req.Content, r.Method)
+	return upsertRole(r.Context(), clt, req.Content, r.Method, params)
 }
 
-func upsertRole(ctx context.Context, clt resourcesAPIGetter, content, httpMethod string) (*ui.ResourceItem, error) {
+func upsertRole(ctx context.Context, clt resourcesAPIGetter, content, httpMethod string, params httprouter.Params) (*ui.ResourceItem, error) {
+	exists := func(ctx context.Context, name string) error {
+		_, err := clt.GetRole(ctx, name)
+		return err
+	}
+
 	extractedRes, err := ExtractResourceAndValidate(content)
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -129,8 +134,7 @@ func upsertRole(ctx context.Context, clt resourcesAPIGetter, content, httpMethod
 		return nil, trace.BadParameter("resource kind %q is invalid", extractedRes.Kind)
 	}
 
-	_, err = clt.GetRole(ctx, extractedRes.Metadata.Name)
-	if err := CheckResourceUpsertableByError(err, httpMethod, extractedRes.Metadata.Name); err != nil {
+	if err := CheckResourceUpsert(ctx, httpMethod, params, extractedRes.Metadata.Name, exists); err != nil {
 		return nil, trace.Wrap(err)
 	}
 
@@ -189,10 +193,15 @@ func (h *Handler) upsertGithubConnectorHandle(w http.ResponseWriter, r *http.Req
 		return nil, trace.Wrap(err)
 	}
 
-	return upsertGithubConnector(r.Context(), clt, req.Content, r.Method)
+	return upsertGithubConnector(r.Context(), clt, req.Content, r.Method, params)
 }
 
-func upsertGithubConnector(ctx context.Context, clt resourcesAPIGetter, content, httpMethod string) (*ui.ResourceItem, error) {
+func upsertGithubConnector(ctx context.Context, clt resourcesAPIGetter, content, httpMethod string, params httprouter.Params) (*ui.ResourceItem, error) {
+	exists := func(ctx context.Context, name string) error {
+		_, err := clt.GetGithubConnector(ctx, name, false)
+		return err
+	}
+
 	extractedRes, err := ExtractResourceAndValidate(content)
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -202,8 +211,7 @@ func upsertGithubConnector(ctx context.Context, clt resourcesAPIGetter, content,
 		return nil, trace.BadParameter("resource kind %q is invalid", extractedRes.Kind)
 	}
 
-	_, err = clt.GetGithubConnector(ctx, extractedRes.Metadata.Name, false)
-	if err := CheckResourceUpsertableByError(err, httpMethod, extractedRes.Metadata.Name); err != nil {
+	if err := CheckResourceUpsert(ctx, httpMethod, params, extractedRes.Metadata.Name, exists); err != nil {
 		return nil, trace.Wrap(err)
 	}
 
@@ -262,10 +270,15 @@ func (h *Handler) upsertTrustedClusterHandle(w http.ResponseWriter, r *http.Requ
 		return nil, trace.Wrap(err)
 	}
 
-	return upsertTrustedCluster(r.Context(), clt, req.Content, r.Method)
+	return upsertTrustedCluster(r.Context(), clt, req.Content, r.Method, params)
 }
 
-func upsertTrustedCluster(ctx context.Context, clt resourcesAPIGetter, content, httpMethod string) (*ui.ResourceItem, error) {
+func upsertTrustedCluster(ctx context.Context, clt resourcesAPIGetter, content, httpMethod string, params httprouter.Params) (*ui.ResourceItem, error) {
+	exists := func(ctx context.Context, name string) error {
+		_, err := clt.GetTrustedCluster(ctx, name)
+		return err
+	}
+
 	extractedRes, err := ExtractResourceAndValidate(content)
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -275,8 +288,7 @@ func upsertTrustedCluster(ctx context.Context, clt resourcesAPIGetter, content, 
 		return nil, trace.BadParameter("resource kind %q is invalid", extractedRes.Kind)
 	}
 
-	_, err = clt.GetTrustedCluster(ctx, extractedRes.Metadata.Name)
-	if err := CheckResourceUpsertableByError(err, httpMethod, extractedRes.Metadata.Name); err != nil {
+	if err := CheckResourceUpsert(ctx, httpMethod, params, extractedRes.Metadata.Name, exists); err != nil {
 		return nil, trace.Wrap(err)
 	}
 
@@ -293,22 +305,58 @@ func upsertTrustedCluster(ctx context.Context, clt resourcesAPIGetter, content, 
 	return ui.NewResourceItem(tc)
 }
 
-// CheckResourceUpsertableByError checks if the resource is upsertable by the state of error with
-// the request http method used.
-func CheckResourceUpsertableByError(err error, httpMethod, resourceName string) error {
-	if err != nil && !trace.IsNotFound(err) {
+type resourceExists func(context.Context, string) error
+
+// CheckResourceUpsert checks if the resource can be created or updated, depending on the http method.
+func CheckResourceUpsert(ctx context.Context, httpMethod string, params httprouter.Params, payloadResourceName string, exists resourceExists) error {
+	switch httpMethod {
+	case http.MethodPost:
+		err := checkResourceCreate(ctx, payloadResourceName, exists)
+		return trace.Wrap(err)
+	case http.MethodPut:
+		resourceName := params.ByName("name")
+		if resourceName == "" {
+			return trace.BadParameter("missing resource name")
+		}
+		err := checkResourceUpdate(ctx, payloadResourceName, resourceName, exists)
+		return trace.Wrap(err)
+	default:
+		return trace.NotImplemented("http method %q not expected. this is a bug!", httpMethod)
+	}
+}
+
+// checkResourceCreate checks if the resource can be created.
+func checkResourceCreate(ctx context.Context, payloadResourceName string, exists resourceExists) error {
+	err := exists(ctx, payloadResourceName)
+	if err != nil {
+		if trace.IsNotFound(err) {
+			// If not found error, then the resource does not exist and can be created.
+			return nil
+		}
 		return trace.Wrap(err)
 	}
 
-	exists := err == nil
-	if exists && httpMethod == http.MethodPost {
-		return trace.AlreadyExists("resource name %q already exists", resourceName)
+	// If no error, then the resource already exists and cannot be created.
+	return trace.AlreadyExists("resource name %q already exists", payloadResourceName)
+}
+
+// checkResourceUpdate checks if the resource can be updated.
+func checkResourceUpdate(ctx context.Context, payloadResourceName, resourceName string, exists resourceExists) error {
+	if payloadResourceName != resourceName {
+		return trace.BadParameter("resource renaming is not supported, please create a different resource and then delete this one")
 	}
 
-	if !exists && httpMethod == http.MethodPut {
-		return trace.NotFound("cannot find resource with name %q", resourceName)
+	err := exists(ctx, resourceName)
+	if err != nil {
+		if trace.IsNotFound(err) {
+			// If not found error, then the resource does not exist and cannot be updated.
+			return trace.NotFound("resource name %q does not exist", resourceName)
+		}
+
+		return trace.Wrap(err)
 	}
 
+	// If no error, then the resource already exists and can be updated.
 	return nil
 }
 
@@ -393,6 +441,6 @@ type resourcesAPIGetter interface {
 	GetTrustedClusters(ctx context.Context) ([]types.TrustedCluster, error)
 	// DeleteTrustedCluster removes a TrustedCluster from the backend by name.
 	DeleteTrustedCluster(ctx context.Context, name string) error
-	// ListResoures returns a paginated list of resources.
+	// ListResources returns a paginated list of resources.
 	ListResources(ctx context.Context, req proto.ListResourcesRequest) (*types.ListResourcesResponse, error)
 }
