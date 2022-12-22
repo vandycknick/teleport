@@ -1100,8 +1100,6 @@ message ProvisionTokenSpecV2Azure {
     // ResourceGroups is a list of Azure resource groups the node is allowed
     // to join from.
     repeated string ResourceGroups = 2 [(gogoproto.jsontag) = "resource_groups,omitempty"];
-    // Regions is a list of Azure regions the node is allowed to join from.
-    repeated string Regions = 3 [(gogoproto.jsontag) = "regions,omitempty"];
   }
   // Allow is a list of Rules, nodes using this token must match one
   // allow rule to use this token.

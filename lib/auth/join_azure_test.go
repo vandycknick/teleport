@@ -22,6 +22,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -34,6 +35,8 @@ import (
 	"github.com/gravitational/trace"
 	"github.com/stretchr/testify/require"
 	"go.mozilla.org/pkcs7"
+	"gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 type azureChallengeResponseConfig struct {
@@ -46,6 +49,59 @@ func withChallengeAzure(challenge string) azureChallengeResponseOption {
 	return func(cfg *azureChallengeResponseConfig) {
 		cfg.Challenge = challenge
 	}
+}
+
+func resourceID(subscription, resourceGroup, name string) string {
+	return fmt.Sprintf(
+		"/subscriptions/%v/resourcegroups/%v/providers/Microsoft.Compute/virtualMachines/%v",
+		subscription, resourceGroup, name,
+	)
+}
+
+func mockVerifyToken(err error) azureVerifyTokenFunc {
+	return func(_ context.Context, rawToken string) (*accessTokenClaims, error) {
+		if err != nil {
+			return nil, err
+		}
+		tok, err := jwt.ParseSigned(rawToken)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		var claims accessTokenClaims
+		if err := tok.UnsafeClaimsWithoutVerification(&claims); err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return &claims, nil
+	}
+}
+
+func makeToken(resourceID string, issueTime time.Time) (string, error) {
+	sig, err := jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.HS256,
+		Key:       []byte("test-key"),
+	}, &jose.SignerOptions{})
+	if err != nil {
+		return "", trace.Wrap(err)
+	}
+	claims := accessTokenClaims{
+		Claims: jwt.Claims{
+			Issuer:    "https://sts.windows.net/test-tenant-id/",
+			Audience:  []string{"https://management.azure.com/"},
+			Subject:   "test",
+			IssuedAt:  jwt.NewNumericDate(issueTime),
+			NotBefore: jwt.NewNumericDate(issueTime),
+			Expiry:    jwt.NewNumericDate(issueTime.Add(time.Minute)),
+			ID:        "id",
+		},
+		ResourceID: resourceID,
+		TenantID:   "test-tenant-id",
+		Version:    "1.0",
+	}
+	raw, err := jwt.Signed(sig).Claims(claims).CompactSerialize()
+	if err != nil {
+		return "", trace.Wrap(err)
+	}
+	return raw, nil
 }
 
 func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
@@ -79,39 +135,47 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 	}
 
 	subID := uuid.NewString()
-	vmID := uuid.NewString()
 
 	tests := []struct {
 		name                     string
+		subscription             string
+		resourceGroup            string
 		tokenName                string
 		requestTokenName         string
 		tokenSpec                types.ProvisionTokenSpecV2
 		challengeResponseOptions []azureChallengeResponseOption
 		challengeResponseErr     error
 		useSystemCertPool        bool
+		verify                   azureVerifyTokenFunc
 		assertError              require.ErrorAssertionFunc
 	}{
 		{
 			name:             "basic passing case",
 			tokenName:        "test-token",
 			requestTokenName: "test-token",
+			subscription:     subID,
+			resourceGroup:    "rg",
 			tokenSpec: types.ProvisionTokenSpecV2{
 				Roles: []types.SystemRole{types.RoleNode},
 				Azure: &types.ProvisionTokenSpecV2Azure{
 					Allow: []*types.ProvisionTokenSpecV2Azure_Rule{
 						{
-							Subscription: subID,
+							Subscription:   subID,
+							ResourceGroups: []string{"rg"},
 						},
 					},
 				},
 				JoinMethod: types.JoinMethodAzure,
 			},
+			verify:      mockVerifyToken(nil),
 			assertError: require.NoError,
 		},
 		{
 			name:             "wrong token",
 			tokenName:        "test-token",
 			requestTokenName: "wrong-token",
+			subscription:     subID,
+			resourceGroup:    "rg",
 			tokenSpec: types.ProvisionTokenSpecV2{
 				Roles: []types.SystemRole{types.RoleNode},
 				Azure: &types.ProvisionTokenSpecV2Azure{
@@ -123,12 +187,15 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 				},
 				JoinMethod: types.JoinMethodAzure,
 			},
+			verify:      mockVerifyToken(nil),
 			assertError: isAccessDenied,
 		},
 		{
 			name:             "challenge response error",
 			tokenName:        "test-token",
 			requestTokenName: "test-token",
+			subscription:     subID,
+			resourceGroup:    "rg",
 			tokenSpec: types.ProvisionTokenSpecV2{
 				Roles: []types.SystemRole{types.RoleNode},
 				Azure: &types.ProvisionTokenSpecV2Azure{
@@ -140,6 +207,7 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 				},
 				JoinMethod: types.JoinMethodAzure,
 			},
+			verify:               mockVerifyToken(nil),
 			challengeResponseErr: trace.BadParameter("test error"),
 			assertError:          isBadParameter,
 		},
@@ -147,23 +215,49 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 			name:             "wrong subscription",
 			tokenName:        "test-token",
 			requestTokenName: "test-token",
+			subscription:     "some-junk",
+			resourceGroup:    "rg",
 			tokenSpec: types.ProvisionTokenSpecV2{
 				Roles: []types.SystemRole{types.RoleNode},
 				Azure: &types.ProvisionTokenSpecV2Azure{
 					Allow: []*types.ProvisionTokenSpecV2Azure_Rule{
 						{
-							Subscription: "some-junk",
+							Subscription: subID,
 						},
 					},
 				},
 				JoinMethod: types.JoinMethodAzure,
 			},
+			verify:      mockVerifyToken(nil),
+			assertError: isAccessDenied,
+		},
+		{
+			name:             "wrong resource group",
+			tokenName:        "test-token",
+			requestTokenName: "test-token",
+			subscription:     subID,
+			resourceGroup:    "wrong-rg",
+			tokenSpec: types.ProvisionTokenSpecV2{
+				Roles: []types.SystemRole{types.RoleNode},
+				Azure: &types.ProvisionTokenSpecV2Azure{
+					Allow: []*types.ProvisionTokenSpecV2Azure_Rule{
+						{
+							Subscription:   subID,
+							ResourceGroups: []string{"rg"},
+						},
+					},
+				},
+				JoinMethod: types.JoinMethodAzure,
+			},
+			verify:      mockVerifyToken(nil),
 			assertError: isAccessDenied,
 		},
 		{
 			name:             "wrong challenge",
 			tokenName:        "test-token",
 			requestTokenName: "test-token",
+			subscription:     subID,
+			resourceGroup:    "rg",
 			tokenSpec: types.ProvisionTokenSpecV2{
 				Roles: []types.SystemRole{types.RoleNode},
 				Azure: &types.ProvisionTokenSpecV2Azure{
@@ -178,12 +272,15 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 			challengeResponseOptions: []azureChallengeResponseOption{
 				withChallengeAzure("wrong-challenge"),
 			},
+			verify:      mockVerifyToken(nil),
 			assertError: isAccessDenied,
 		},
 		{
 			name:             "invalid signature",
 			tokenName:        "test-token",
 			requestTokenName: "test-token",
+			subscription:     subID,
+			resourceGroup:    "rg",
 			tokenSpec: types.ProvisionTokenSpecV2{
 				Roles: []types.SystemRole{types.RoleNode},
 				Azure: &types.ProvisionTokenSpecV2Azure{
@@ -195,6 +292,7 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 				},
 				JoinMethod: types.JoinMethodAzure,
 			},
+			verify:            mockVerifyToken(nil),
 			useSystemCertPool: true,
 			assertError:       require.Error,
 		},
@@ -211,6 +309,9 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 			t.Cleanup(func() {
 				require.NoError(t, a.DeleteToken(ctx, token.GetName()))
 			})
+
+			accessToken, err := makeToken(resourceID(tc.subscription, tc.resourceGroup, "test-vm"), a.clock.Now())
+			require.NoError(t, err)
 
 			reqCtx := context.Background()
 			reqCtx = context.WithValue(reqCtx, ContextClientAddr, &net.IPAddr{})
@@ -229,7 +330,6 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 				ad := attestedData{
 					Nonce:          cfg.Challenge,
 					SubscriptionID: subID,
-					ID:             vmID,
 				}
 				adBytes, err := json.Marshal(&ad)
 				require.NoError(t, err)
@@ -254,9 +354,10 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 						PublicTLSKey: tlsPublicKey,
 					},
 					AttestedData: signedADBytes,
+					AccessToken:  accessToken,
 				}
 				return req, tc.challengeResponseErr
-			}, withCertPool(certPool))
+			}, withCertPool(certPool), withVerifyFunc(tc.verify))
 			tc.assertError(t, err)
 		})
 	}
