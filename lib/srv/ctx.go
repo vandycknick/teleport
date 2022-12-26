@@ -457,6 +457,7 @@ func NewServerContext(ctx context.Context, parent *sshutils.ConnectionContext, s
 		LockingMode:           identityContext.AccessChecker.LockingMode(authPref.GetLockingMode()),
 		DisconnectExpiredCert: child.disconnectExpiredCert,
 		ClientIdleTimeout:     child.clientIdleTimeout,
+		IdleTimeoutMessage:    netConfig.GetClientIdleTimeoutMessage(),
 		Clock:                 child.srv.GetClock(),
 		Tracker:               child,
 		Conn:                  child.ServerConn,

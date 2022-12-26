@@ -540,7 +540,6 @@ func monitorConn(ctx context.Context, cfg monitorConnConfig) (net.Conn, error) {
 		return nil, trace.Wrap(err)
 	}
 
-	idleTimeout := cfg.checker.AdjustClientIdleTimeout(netConfig.GetClientIdleTimeout())
 	ctx, cancel := context.WithCancel(ctx)
 	tc, err := srv.NewTrackingReadConn(srv.TrackingReadConnConfig{
 		Conn:    cfg.conn,
@@ -557,7 +556,8 @@ func monitorConn(ctx context.Context, cfg monitorConnConfig) (net.Conn, error) {
 		LockWatcher:           cfg.lockWatcher,
 		LockTargets:           cfg.lockTargets,
 		DisconnectExpiredCert: srv.GetDisconnectExpiredCertFromIdentity(cfg.checker, authPref, &cfg.identity),
-		ClientIdleTimeout:     idleTimeout,
+		ClientIdleTimeout:     cfg.checker.AdjustClientIdleTimeout(netConfig.GetClientIdleTimeout()),
+		IdleTimeoutMessage:    netConfig.GetClientIdleTimeoutMessage(),
 		Conn:                  cfg.conn,
 		Tracker:               tc,
 		Context:               cfg.ctx,
@@ -566,6 +566,7 @@ func monitorConn(ctx context.Context, cfg monitorConnConfig) (net.Conn, error) {
 		TeleportUser:          cfg.teleportUser,
 		Emitter:               cfg.emitter,
 		Entry:                 cfg.log,
+		// TODO: set MessageWriter
 	})
 	if err != nil {
 		tc.Close()

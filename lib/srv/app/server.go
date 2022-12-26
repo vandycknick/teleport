@@ -715,14 +715,13 @@ func (s *Server) monitorConn(ctx context.Context, tc *srv.TrackingReadConn, auth
 	identity := authCtx.Identity.GetIdentity()
 	checker := authCtx.Checker
 
-	idleTimeout := checker.AdjustClientIdleTimeout(netConfig.GetClientIdleTimeout())
-
 	// Start monitoring client connection. When client connection is closed the monitor goroutine exits.
 	err = srv.StartMonitor(srv.MonitorConfig{
 		LockWatcher:           s.c.LockWatcher,
 		LockTargets:           authCtx.LockTargets(),
 		DisconnectExpiredCert: srv.GetDisconnectExpiredCertFromIdentity(checker, authPref, &identity),
-		ClientIdleTimeout:     idleTimeout,
+		ClientIdleTimeout:     checker.AdjustClientIdleTimeout(netConfig.GetClientIdleTimeout()),
+		IdleTimeoutMessage:    netConfig.GetClientIdleTimeoutMessage(),
 		Conn:                  tc,
 		Tracker:               tc,
 		Context:               ctx,
@@ -732,6 +731,7 @@ func (s *Server) monitorConn(ctx context.Context, tc *srv.TrackingReadConn, auth
 		Emitter:               s.c.Emitter,
 		Entry:                 s.log,
 		MonitorCloseChannel:   s.c.MonitorCloseChannel,
+		// TODO: set MessageWriter
 	})
 	if err != nil {
 		return trace.Wrap(err)

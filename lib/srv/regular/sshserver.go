@@ -1393,7 +1393,6 @@ func (s *Server) handleSessionRequests(ctx context.Context, ccx *sshutils.Connec
 	// Create context for this channel. This context will be closed when the
 	// session request is complete.
 	ctx, scx, err := srv.NewServerContext(ctx, ccx, s, identityContext, func(cfg *srv.MonitorConfig) {
-		cfg.IdleTimeoutMessage = netConfig.GetClientIdleTimeoutMessage()
 		cfg.MessageWriter = &stderrWriter{channel: ch}
 	})
 	if err != nil {

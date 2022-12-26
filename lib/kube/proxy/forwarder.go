@@ -327,6 +327,8 @@ type authContext struct {
 	recordingConfig   types.SessionRecordingConfig
 	// clientIdleTimeout sets information on client idle timeout
 	clientIdleTimeout time.Duration
+	// idleTimeoutMessage is sent to the client when the idle timeout expires.
+	idleTimeoutMessage string
 	// disconnectExpiredCert if set, controls the time when the connection
 	// should be disconnected because the client cert expires
 	disconnectExpiredCert time.Time
@@ -679,6 +681,7 @@ func (f *Forwarder) setupContext(authCtx auth.Context, req *http.Request, isRemo
 
 	return &authContext{
 		clientIdleTimeout:     roles.AdjustClientIdleTimeout(netConfig.GetClientIdleTimeout()),
+		idleTimeoutMessage:    netConfig.GetClientIdleTimeoutMessage(),
 		sessionTTL:            sessionTTL,
 		Context:               authCtx,
 		kubeGroups:            utils.StringsSet(kubeGroups),
@@ -1687,6 +1690,7 @@ func (s *clusterSession) monitorConn(conn net.Conn, err error) (net.Conn, error)
 		LockTargets:           s.LockTargets(),
 		DisconnectExpiredCert: s.disconnectExpiredCert,
 		ClientIdleTimeout:     s.clientIdleTimeout,
+		IdleTimeoutMessage:    s.idleTimeoutMessage,
 		Clock:                 s.parent.cfg.Clock,
 		Tracker:               tc,
 		Conn:                  tc,
@@ -1695,6 +1699,7 @@ func (s *clusterSession) monitorConn(conn net.Conn, err error) (net.Conn, error)
 		ServerID:              s.parent.cfg.HostID,
 		Entry:                 s.parent.log,
 		Emitter:               s.parent.cfg.AuthClient,
+		// TODO: set MessageWriter
 	})
 	if err != nil {
 		tc.Close()
