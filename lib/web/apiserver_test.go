@@ -121,8 +121,6 @@ import (
 	"github.com/gravitational/teleport/lib/web/ui"
 )
 
-const hostID = "00000000-0000-0000-0000-000000000000"
-
 type WebSuite struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -242,13 +240,12 @@ func newWebSuiteWithConfig(t *testing.T, cfg webSuiteConfig) *WebSuite {
 	tlsPub, err := auth.PrivateKeyToPublicKeyTLS(priv)
 	require.NoError(t, err)
 
-	nodeID := "node"
-
 	// start node
+	nodeID := uuid.NewString()
 	certs, err := s.server.Auth().GenerateHostCerts(s.ctx,
 		&authproto.HostCertsRequest{
-			HostID:       hostID,
-			NodeName:     nodeID,
+			HostID:       nodeID,
+			NodeName:     "node",
 			Role:         types.RoleNode,
 			PublicSSHKey: pub,
 			PublicTLSKey: tlsPub,
@@ -289,7 +286,7 @@ func newWebSuiteWithConfig(t *testing.T, cfg webSuiteConfig) *WebSuite {
 	node, err := regular.New(
 		ctx,
 		utils.NetAddr{AddrNetwork: "tcp", Addr: "127.0.0.1:0"},
-		nodeID,
+		s.server.ClusterName(),
 		[]ssh.Signer{signer},
 		nodeClient,
 		nodeDataDir,
@@ -1456,7 +1453,7 @@ func TestTerminal(t *testing.T) {
 
 func TestTerminalRouting(t *testing.T) {
 	t.Parallel()
-	s := newWebSuite(t)
+	s := newWebSuiteWithConfig(t, webSuiteConfig{disableDiskBasedRecording: true})
 
 	// add nodes with various conflicting values
 	llama := s.addNode(t, uuid.NewString(), "llama", "127.0.0.1:0")
@@ -1504,7 +1501,7 @@ func TestTerminalRouting(t *testing.T) {
 			name:   "ambiguous host",
 			target: "alpaca",
 			output: "error: ambiguous host could match multiple nodes",
-			// failed resolution results in the server closing the socket first, so expect an ok close error
+			// failed resolution may result in the server closing the socket first
 			wsCloseAssertion: closeOkNetworkError,
 		},
 		{
@@ -1517,7 +1514,7 @@ func TestTerminalRouting(t *testing.T) {
 			name:   "ambiguous ip",
 			target: "127.0.0.1",
 			output: "error: ambiguous host could match multiple nodes",
-			// failed resolution results in the server closing the socket first, so expect an ok close error
+			// failed resolution mya result in the server closing the socket first
 			wsCloseAssertion: closeOkNetworkError,
 		},
 	}
@@ -6061,7 +6058,9 @@ func (s *WebSuite) makeTerminal(t *testing.T, pack *authPack, opts ...terminalOp
 
 	ws, resp, err := dialer.Dial(u.String(), header)
 	if err != nil {
-		return nil, nil, trace.Wrap(err)
+		body, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		return nil, nil, trace.Wrap(err, string(body))
 	}
 
 	ty, raw, err := ws.ReadMessage()
@@ -6243,12 +6242,12 @@ func newWebPack(t *testing.T, numProxies int) *webPack {
 	tlsPub, err := auth.PrivateKeyToPublicKeyTLS(priv)
 	require.NoError(t, err)
 
-	const nodeID = "node"
+	nodeID := uuid.NewString()
 	// start auth server
 	certs, err := server.Auth().GenerateHostCerts(ctx,
 		&authproto.HostCertsRequest{
-			HostID:       hostID,
-			NodeName:     nodeID,
+			HostID:       nodeID,
+			NodeName:     "node",
 			Role:         types.RoleNode,
 			PublicSSHKey: pub,
 			PublicTLSKey: tlsPub,
@@ -6292,7 +6291,7 @@ func newWebPack(t *testing.T, numProxies int) *webPack {
 	node, err := regular.New(
 		ctx,
 		utils.NetAddr{AddrNetwork: "tcp", Addr: "127.0.0.1:0"},
-		nodeID,
+		server.TLS.ClusterName(),
 		hostSigners,
 		nodeClient,
 		nodeDataDir,
