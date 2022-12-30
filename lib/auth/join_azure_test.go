@@ -31,6 +31,7 @@ import (
 	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/lib/auth/testauthority"
+	"github.com/gravitational/teleport/lib/cloud/azure"
 	"github.com/gravitational/teleport/lib/fixtures"
 	"github.com/gravitational/trace"
 	"github.com/stretchr/testify/require"
@@ -38,6 +39,15 @@ import (
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
+
+type mockAzureVMClient struct {
+	azure.VirtualMachinesClient
+	vm *azure.VirtualMachine
+}
+
+func (m *mockAzureVMClient) Get(_ context.Context, _ string) (*azure.VirtualMachine, error) {
+	return m.vm, nil
+}
 
 type azureChallengeResponseConfig struct {
 	Challenge string
@@ -140,6 +150,7 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 		name                     string
 		subscription             string
 		resourceGroup            string
+		vmID                     string
 		tokenName                string
 		requestTokenName         string
 		tokenSpec                types.ProvisionTokenSpecV2
@@ -147,6 +158,7 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 		challengeResponseErr     error
 		certs                    []*x509.Certificate
 		verify                   azureVerifyTokenFunc
+		vmResult                 *azure.VirtualMachine
 		assertError              require.ErrorAssertionFunc
 	}{
 		{
@@ -302,6 +314,33 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 			certs:       []*x509.Certificate{},
 			assertError: require.Error,
 		},
+		{
+			name:             "attested data and access token from different VMs",
+			tokenName:        "test-token",
+			requestTokenName: "test-token",
+			subscription:     subID,
+			resourceGroup:    "rg",
+			vmID:             "vm-id",
+			tokenSpec: types.ProvisionTokenSpecV2{
+				Roles: []types.SystemRole{types.RoleNode},
+				Azure: &types.ProvisionTokenSpecV2Azure{
+					Allow: []*types.ProvisionTokenSpecV2Azure_Rule{
+						{
+							Subscription: subID,
+						},
+					},
+				},
+				JoinMethod: types.JoinMethodAzure,
+			},
+			vmResult: &azure.VirtualMachine{
+				Subscription:  subID,
+				ResourceGroup: "rg",
+				VMID:          "different-id",
+			},
+			verify:      mockVerifyToken(nil),
+			certs:       []*x509.Certificate{tlsConfig.Certificate},
+			assertError: isAccessDenied,
+		},
 	}
 
 	for _, tc := range tests {
@@ -316,11 +355,26 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 				require.NoError(t, a.DeleteToken(ctx, token.GetName()))
 			})
 
-			accessToken, err := makeToken(resourceID(tc.subscription, tc.resourceGroup, "test-vm"), a.clock.Now())
+			rsID := resourceID(tc.subscription, tc.resourceGroup, "test-vm")
+
+			accessToken, err := makeToken(rsID, a.clock.Now())
 			require.NoError(t, err)
 
 			reqCtx := context.Background()
 			reqCtx = context.WithValue(reqCtx, ContextClientAddr, &net.IPAddr{})
+
+			vmResult := tc.vmResult
+			if vmResult == nil {
+				vmResult = &azure.VirtualMachine{
+					ID:            rsID,
+					Name:          "test-vm",
+					Subscription:  tc.subscription,
+					ResourceGroup: tc.resourceGroup,
+					VMID:          tc.vmID,
+				}
+			}
+
+			vmClient := &mockAzureVMClient{vm: vmResult}
 
 			_, err = a.RegisterUsingAzureMethod(reqCtx, func(challenge string) (*proto.RegisterUsingAzureMethodRequest, error) {
 				cfg := &azureChallengeResponseConfig{Challenge: challenge}
@@ -331,6 +385,7 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 				ad := attestedData{
 					Nonce:          cfg.Challenge,
 					SubscriptionID: subID,
+					ID:             tc.vmID,
 				}
 				adBytes, err := json.Marshal(&ad)
 				require.NoError(t, err)
@@ -358,7 +413,7 @@ func TestAuth_RegisterUsingAzureMethod(t *testing.T) {
 					AccessToken:  accessToken,
 				}
 				return req, tc.challengeResponseErr
-			}, withCerts(tc.certs), withVerifyFunc(tc.verify))
+			}, withCerts(tc.certs), withVerifyFunc(tc.verify), withVMClient(vmClient))
 			tc.assertError(t, err)
 		})
 	}

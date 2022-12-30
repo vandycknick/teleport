@@ -24,12 +24,14 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net"
-	"regexp"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 	"github.com/coreos/go-oidc"
 	"github.com/gravitational/teleport/api/client"
 	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/api/types"
+	"github.com/gravitational/teleport/lib/cloud/azure"
 	"github.com/gravitational/trace"
 	"github.com/jonboulle/clockwork"
 	"go.mozilla.org/pkcs7"
@@ -70,18 +72,13 @@ type accessTokenClaims struct {
 	Version    string `json:"ver"`
 }
 
-// TODO(atburke): consider replacing this
-type vmInfo struct {
-	subscription  string
-	resourceGroup string
-}
-
 type azureVerifyTokenFunc func(ctx context.Context, rawIDToken string) (*accessTokenClaims, error)
 
 type azureRegisterConfig struct {
-	clock  clockwork.Clock
-	certs  []*x509.Certificate
-	verify azureVerifyTokenFunc
+	clock    clockwork.Clock
+	certs    []*x509.Certificate
+	verify   azureVerifyTokenFunc
+	vmClient azure.VirtualMachinesClient
 }
 
 func verifyFuncFromOIDCVerifier(verifier *oidc.IDTokenVerifier) azureVerifyTokenFunc {
@@ -137,56 +134,60 @@ func withVerifyFunc(verify azureVerifyTokenFunc) azureRegisterOption {
 	}
 }
 
+func withVMClient(vmClient azure.VirtualMachinesClient) azureRegisterOption {
+	return func(cfg *azureRegisterConfig) {
+		cfg.vmClient = vmClient
+	}
+}
+
 // parseAndVeryAttestedData verifies that an attested data document was signed
 // by Azure.
-//
-// If certPool is nil, the system cert pool will be used.
-func parseAndVerifyAttestedData(adBytes []byte, challenge string, certs []*x509.Certificate) error {
+func parseAndVerifyAttestedData(adBytes []byte, challenge string, certs []*x509.Certificate) (string, error) {
 	var signedAD signedAttestedData
 	if err := json.Unmarshal(adBytes, &signedAD); err != nil {
-		return trace.Wrap(err)
+		return "", trace.Wrap(err)
 	}
 	if signedAD.Encoding != "pkcs7" {
-		return trace.AccessDenied("unsupported signature type: %v", signedAD.Encoding)
+		return "", trace.AccessDenied("unsupported signature type: %v", signedAD.Encoding)
 	}
 
 	sigPEM := fmt.Sprintf("-----BEGIN PKCS7-----\n%s\n-----END PKCS7-----", string(signedAD.Signature))
 	sigBER, _ := pem.Decode([]byte(sigPEM))
 	if sigBER == nil {
-		return trace.AccessDenied("unable to decode attested data document")
+		return "", trace.AccessDenied("unable to decode attested data document")
 	}
 
 	p7, err := pkcs7.Parse(sigBER.Bytes)
 	if err != nil {
-		return trace.Wrap(err)
+		return "", trace.Wrap(err)
 	}
 
 	p7.Certificates = certs
 	if err := p7.Verify(); err != nil {
-		return trace.Wrap(err)
+		return "", trace.Wrap(err)
 	}
 
 	var ad attestedData
 	if err := json.Unmarshal(p7.Content, &ad); err != nil {
-		return trace.Wrap(err)
+		return "", trace.Wrap(err)
 	}
 
 	if ad.Nonce != challenge {
-		return trace.AccessDenied("challenge is missing or does not match")
+		return "", trace.AccessDenied("challenge is missing or does not match")
 	}
 
-	return nil
+	return ad.ID, nil
 }
 
-func checkAzureAllowRules(vm *vmInfo, allowRules []*types.ProvisionTokenSpecV2Azure_Rule) error {
+func checkAzureAllowRules(vm *azure.VirtualMachine, allowRules []*types.ProvisionTokenSpecV2Azure_Rule) error {
 	for _, rule := range allowRules {
 		if len(rule.Subscription) > 0 {
-			if rule.Subscription != vm.subscription {
+			if rule.Subscription != vm.Subscription {
 				continue
 			}
 		}
 		if len(rule.ResourceGroups) > 0 {
-			if !slices.Contains(rule.ResourceGroups, vm.resourceGroup) {
+			if !slices.Contains(rule.ResourceGroups, vm.ResourceGroup) {
 				continue
 			}
 		}
@@ -206,7 +207,8 @@ func (a *Server) checkAzureRequest(ctx context.Context, challenge string, req *p
 		return trace.AccessDenied("this token does not support the Azure join method")
 	}
 
-	if err := parseAndVerifyAttestedData(req.AttestedData, challenge, cfg.certs); err != nil {
+	vmID, err := parseAndVerifyAttestedData(req.AttestedData, challenge, cfg.certs)
+	if err != nil {
 		return trace.Wrap(err)
 	}
 
@@ -230,15 +232,30 @@ func (a *Server) checkAzureRequest(ctx context.Context, challenge string, req *p
 		return trace.Wrap(err)
 	}
 
-	subscription, resourceGroup, _, err := parseResourceID(tokenClaims.ResourceID)
+	rsID, err := arm.ParseResourceID(tokenClaims.ResourceID)
 	if err != nil {
 		return trace.Wrap(err)
 	}
 
-	// TODO(atburke): get resource group and region
-	vm := &vmInfo{
-		subscription:  subscription,
-		resourceGroup: resourceGroup,
+	vmClient := cfg.vmClient
+	if vmClient == nil {
+		tokenCredential := azure.NewStaticCredential(azcore.AccessToken{
+			Token:     req.AccessToken,
+			ExpiresOn: tokenClaims.Expiry.Time(),
+		})
+		var err error
+		vmClient, err = azure.NewVirtualMachinesClient(rsID.SubscriptionID, tokenCredential, nil)
+		if err != nil {
+			return trace.Wrap(err)
+		}
+	}
+
+	vm, err := vmClient.Get(ctx, tokenClaims.ResourceID)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	if vm.VMID != vmID {
+		return trace.AccessDenied("vm ID does not match")
 	}
 
 	token, ok := provisionToken.(*types.ProvisionTokenV2)
@@ -302,14 +319,4 @@ func (a *Server) RegisterUsingAzureMethod(ctx context.Context, challengeResponse
 
 	certs, err := a.generateCerts(ctx, provisionToken, req.RegisterUsingTokenRequest)
 	return certs, trace.Wrap(err)
-}
-
-var resourceIDPattern = regexp.MustCompile("/subscriptions/([^/]+)/resourcegroups/([^/]+)/providers/Microsoft.Compute/virtualMachines/([^/]+)")
-
-func parseResourceID(resourceID string) (subscription, resourceGroup, vmName string, err error) {
-	match := resourceIDPattern.FindStringSubmatch(resourceID)
-	if match == nil {
-		return "", "", "", trace.BadParameter("input is not a valid resource ID")
-	}
-	return match[1], match[2], match[3], nil
 }
