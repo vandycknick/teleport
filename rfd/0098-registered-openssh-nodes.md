@@ -39,7 +39,18 @@ spec:
 version: v2
 ```
 
-`tctl` will auto-generate `metadata.name` if it is not already set so users don't have to generate GUIDs themselves if `sub_kind` is `agentless`. Also, if `sub_kind` is set to `agentless`, `spec.public_addr` will not be allowed for registered OpenSSH nodes as it is not needed.
+`tctl` will auto-generate `metadata.name` if it is not already set so users don't have to generate GUIDs themselves if `sub_kind` is `agentless`. Also, if `sub_kind` is set to `agentless`, `spec.public_addr` will not be allowed for registered OpenSSH nodes as it is not needed. An example of a registered OpenSSH node resource:
+
+```yaml
+kind: node
+sub_kind: agentless
+metadata:
+  name: 5da56852-2adb-4540-a37c-80790203f6a9
+spec:
+  addr: 1.2.3.4:22
+  hostname: agentless-node
+version: v2
+```
 
 ### Agentless CA
 
