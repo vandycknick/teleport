@@ -37,6 +37,7 @@ import (
 	"github.com/gravitational/teleport/lib"
 	"github.com/gravitational/teleport/lib/auth/native"
 	"github.com/gravitational/teleport/lib/circleci"
+	"github.com/gravitational/teleport/lib/cloud/azure"
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/githubactions"
 	"github.com/gravitational/teleport/lib/kubernetestoken"
@@ -281,8 +282,9 @@ func proxyServerIsAuth(server utils.NetAddr) bool {
 // registerThroughProxy is used to register through the proxy server.
 func registerThroughProxy(token string, params RegisterParams) (*proto.Certs, error) {
 	var certs *proto.Certs
-	if params.JoinMethod == types.JoinMethodIAM {
-		// IAM join method requires gRPC client
+	switch params.JoinMethod {
+	case types.JoinMethodIAM, types.JoinMethodAzure:
+		// IAM and Azure join methods require gRPC client
 		conn, err := proxyJoinServiceConn(params)
 		if err != nil {
 			return nil, trace.Wrap(err)
@@ -290,12 +292,17 @@ func registerThroughProxy(token string, params RegisterParams) (*proto.Certs, er
 		defer conn.Close()
 
 		joinServiceClient := client.NewJoinServiceClient(proto.NewJoinServiceClient(conn))
-		certs, err = registerUsingIAMMethod(joinServiceClient, token, params)
+		if params.JoinMethod == types.JoinMethodIAM {
+			certs, err = registerUsingIAMMethod(joinServiceClient, token, params)
+		} else {
+			certs, err = registerUsingAzureMethod(joinServiceClient, token, params)
+		}
+
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
-	} else {
-		// non-IAM join methods use GetHostCredentials function passed through
+	default:
+		// The rest of the join methods use GetHostCredentials function passed through
 		// params to call proxy HTTP endpoint
 		var err error
 		certs, err = params.GetHostCredentials(context.Background(),
@@ -349,10 +356,13 @@ func registerThroughAuth(token string, params RegisterParams) (*proto.Certs, err
 	defer client.Close()
 
 	var certs *proto.Certs
-	if params.JoinMethod == types.JoinMethodIAM {
+	switch params.JoinMethod {
+	case types.JoinMethodIAM:
 		// IAM method uses unique gRPC endpoint
 		certs, err = registerUsingIAMMethod(client, token, params)
-	} else {
+	case types.JoinMethodAzure:
+		certs, err = registerUsingAzureMethod(client, token, params)
+	default:
 		// non-IAM join methods use HTTP endpoint
 		// Get the SSH and X509 certificates for a node.
 		certs, err = client.RegisterUsingToken(
@@ -603,6 +613,47 @@ func registerUsingIAMMethod(joinServiceClient joinServiceClient, token string, p
 	}
 
 	return nil, trace.NewAggregate(errs...)
+}
+
+// registerUsingAzureMethod is used to register using the Azure join method. It
+// is able to register through a proxy or through the auth server directly.
+func registerUsingAzureMethod(client joinServiceClient, token string, params RegisterParams) (*proto.Certs, error) {
+	ctx := context.Background()
+	certs, err := client.RegisterUsingAzureMethod(ctx, func(challenge string) (*proto.RegisterUsingAzureMethodRequest, error) {
+		imds := azure.NewInstanceMetadataClient()
+		if !imds.IsAvailable(ctx) {
+			return nil, trace.AccessDenied("Could not reach instance metadata. Is Teleport running on an Azure VM?")
+		}
+		ad, err := imds.GetAttestedData(ctx, challenge)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		accessToken, err := imds.GetAccessToken(ctx)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+
+		return &proto.RegisterUsingAzureMethodRequest{
+			RegisterUsingTokenRequest: &types.RegisterUsingTokenRequest{
+				Token:                token,
+				HostID:               params.ID.HostUUID,
+				NodeName:             params.ID.NodeName,
+				Role:                 params.ID.Role,
+				AdditionalPrincipals: params.AdditionalPrincipals,
+				DNSNames:             params.DNSNames,
+				PublicTLSKey:         params.PublicTLSKey,
+				PublicSSHKey:         params.PublicSSHKey,
+			},
+			AttestedData: ad,
+			AccessToken:  accessToken,
+		}, nil
+	})
+	if err != nil {
+		log.WithError(err).Infof("Failed to register %s", params.ID.Role)
+	} else {
+		log.Infof("Successfully registered %s with Azure method", params.ID.Role)
+	}
+	return certs, trace.Wrap(err)
 }
 
 // ReRegisterParams specifies parameters for re-registering
