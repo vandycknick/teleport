@@ -58,6 +58,8 @@ const (
 	// it can continue after the parent process assigns a cgroup to the
 	// child process.
 	ContinueFile
+
+	TerminateFile
 	// X11File is used to communicate to the parent process that the child
 	// process has set up X11 forwarding.
 	X11File
@@ -68,7 +70,7 @@ const (
 
 	// FirstExtraFile is the first file descriptor that will be valid when
 	// extra files are passed to child processes without a terminal.
-	FirstExtraFile FileFD = X11File + 1
+	FirstExtraFile = X11File + 1
 )
 
 // ExecCommand contains the payload to "teleport exec" which will be used to
@@ -188,6 +190,10 @@ func RunCommand() (errw io.Writer, code int, err error) {
 	contfd := os.NewFile(ContinueFile, "/proc/self/fd/4")
 	if contfd == nil {
 		return errorWriter, teleport.RemoteCommandFailure, trace.BadParameter("continue pipe not found")
+	}
+	termiantefd := os.NewFile(TerminateFile, "/proc/self/fd/8")
+	if termiantefd == nil {
+		return errorWriter, teleport.RemoteCommandFailure, trace.BadParameter("terminate pipe not found")
 	}
 
 	// Read in the command payload.
@@ -857,6 +863,7 @@ func ConfigureCommand(ctx *ServerContext, extraFiles ...*os.File) (*exec.Cmd, er
 		ExtraFiles: []*os.File{
 			ctx.cmdr,
 			ctx.contr,
+			ctx.terminater,
 			ctx.x11rdyw,
 		},
 	}
