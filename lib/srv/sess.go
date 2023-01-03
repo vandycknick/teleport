@@ -19,11 +19,14 @@ package srv
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/user"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/google/uuid"
@@ -634,6 +637,24 @@ func (s *session) Stop() {
 		if err := s.term.Close(); err != nil {
 			s.log.WithError(err).Debug("Failed to close the shell")
 		}
+		if err := s.scx.terminatew.Close(); err != nil {
+			s.log.WithError(err).Debug("Failed to terminate terminal. Trying to kill.")
+		}
+
+		pid := s.term.PID()
+
+		for i := 0; i < 10; i++ {
+			proc, err := os.FindProcess(pid)
+			if err != nil {
+				s.log.WithError(err).Debug("Failed to find process")
+				break
+			}
+			if err := proc.Signal(syscall.Signal(0)); errors.Is(err, os.ErrProcessDone) {
+				break
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+
 		if err := s.term.Kill(context.TODO()); err != nil {
 			s.log.WithError(err).Debug("Failed to kill the shell")
 		}

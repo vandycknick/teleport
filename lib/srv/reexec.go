@@ -407,12 +407,29 @@ func RunCommand() (errw io.Writer, code int, err error) {
 
 	parkerCancel()
 
-	// Wait for the command to exit. It doesn't make sense to print an error
-	// message here because the shell has successfully started. If an error
-	// occurred during shell execution or the shell exits with an error (like
-	// running exit 2), the shell will print an error if appropriate and return
-	// an exit code.
-	err = cmd.Wait()
+	terminateChan := make(chan error)
+
+	go func() {
+		buf := make([]byte, 1)
+		_, err := termiantefd.Read(buf)
+		if err == io.EOF {
+			err = cmd.Process.Kill()
+		}
+		terminateChan <- err
+	}()
+
+	go func() {
+		// Wait for the command to exit. It doesn't make sense to print an error
+		// message here because the shell has successfully started. If an error
+		// occurred during shell execution or the shell exits with an error (like
+		// running exit 2), the shell will print an error if appropriate and return
+		// an exit code.
+		err = cmd.Wait()
+
+		terminateChan <- err
+	}()
+
+	err = <-terminateChan
 
 	if uaccEnabled {
 		uaccErr := uacc.Close(c.UaccMetadata.UtmpPath, c.UaccMetadata.WtmpPath, tty)
