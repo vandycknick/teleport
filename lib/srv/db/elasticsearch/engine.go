@@ -34,6 +34,7 @@ import (
 	"github.com/gravitational/trace"
 
 	"github.com/gravitational/teleport"
+	"github.com/gravitational/teleport/api/types"
 	apievents "github.com/gravitational/teleport/api/types/events"
 	"github.com/gravitational/teleport/api/types/wrappers"
 	"github.com/gravitational/teleport/lib/events"
@@ -104,6 +105,12 @@ func (e *Engine) SendError(err error) {
 		e.Log.Errorf("elasticsearch error: %+v", trace.Unwrap(err))
 		return
 	}
+}
+
+// TestConnection performs a quick test to confirm whether the database is
+// accessible from the database agent.
+func (e *Engine) TestConnection(ctx context.Context, database types.Database) error {
+	return trace.Wrap(common.TestHTTPConnection(ctx, "https://"+database.GetURI()))
 }
 
 // HandleConnection authorizes the incoming client connection, connects to the

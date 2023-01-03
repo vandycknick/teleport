@@ -36,6 +36,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodbstreams"
 	"github.com/gravitational/trace"
 
+	"github.com/gravitational/teleport/api/types"
 	apievents "github.com/gravitational/teleport/api/types/events"
 	apiaws "github.com/gravitational/teleport/api/utils/aws"
 	"github.com/gravitational/teleport/lib/defaults"
@@ -138,6 +139,21 @@ func (e *Engine) SendError(err error) {
 		e.Log.WithError(err).Error("failed to send error response to DynamoDB client")
 		return
 	}
+}
+
+// TestConnection performs a quick test to confirm whether the database is
+// accessible from the database agent.
+func (e *Engine) TestConnection(ctx context.Context, database types.Database) error {
+	// Assuming default DynamoDB service is always available. Only test when
+	// custom URI is provided.
+	uri := e.sessionCtx.Database.GetURI()
+	if uri == "" {
+		return nil
+	}
+	if !strings.Contains(uri, "://") {
+		uri = "https://" + uri
+	}
+	return trace.Wrap(common.TestHTTPConnection(ctx, uri))
 }
 
 // HandleConnection authorizes the incoming client connection, connects to the

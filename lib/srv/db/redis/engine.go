@@ -136,6 +136,16 @@ func (e *Engine) sendToClient(vals interface{}) error {
 	return nil
 }
 
+// TestConnection performs a quick test to confirm whether the database is
+// accessible from the database agent.
+func (e *Engine) TestConnection(ctx context.Context, database types.Database) error {
+	connectionOptions, err := connection.ParseRedisAddress(database.GetURI())
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	return trace.Wrap(common.TestTCPConnection(ctx, net.JoinHostPort(connectionOptions.Address, connectionOptions.Port)))
+}
+
 // HandleConnection is responsible for connecting to a Redis instance/cluster.
 func (e *Engine) HandleConnection(ctx context.Context, sessionCtx *common.Session) error {
 	// Check that the user has access to the database.

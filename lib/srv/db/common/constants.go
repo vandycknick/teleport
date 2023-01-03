@@ -25,4 +25,7 @@ const (
 
 	// MaxPages is the maximum number of pages to iterate over when fetching cloud databases.
 	MaxPages = 10
+
+	// DefaultTestConnectionTimeout is the timeout used for quick connection test.
+	DefaultTestConnectionTimeout = 5 * time.Second
 )

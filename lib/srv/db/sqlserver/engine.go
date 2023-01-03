@@ -23,6 +23,7 @@ import (
 
 	"github.com/gravitational/trace"
 
+	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/api/types/events"
 	libevents "github.com/gravitational/teleport/lib/events"
 	"github.com/gravitational/teleport/lib/services"
@@ -67,6 +68,12 @@ func (e *Engine) SendError(err error) {
 			e.Log.WithError(errSend).Warnf("Failed to send error to client: %v.", err)
 		}
 	}
+}
+
+// TestConnection performs a quick test to confirm whether the database is
+// accessible from the database agent.
+func (e *Engine) TestConnection(ctx context.Context, database types.Database) error {
+	return trace.Wrap(common.TestTCPConnection(ctx, database.GetURI()))
 }
 
 // HandleConnection authorizes the incoming client connection, connects to the

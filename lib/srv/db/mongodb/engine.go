@@ -22,7 +22,9 @@ import (
 
 	"github.com/gravitational/trace"
 	"go.mongodb.org/mongo-driver/x/mongo/driver"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
 
+	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/services"
 	"github.com/gravitational/teleport/lib/srv/db/common"
@@ -61,6 +63,25 @@ func (e *Engine) SendError(err error) {
 	if err != nil && !utils.IsOKNetworkError(err) {
 		e.replyError(e.clientConn, nil, err)
 	}
+}
+
+// TestConnection performs a quick test to confirm whether the database is
+// accessible from the database agent.
+func (e *Engine) TestConnection(ctx context.Context, database types.Database) error {
+	connString, err := connstring.ParseAndValidate(database.GetURI())
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	// TODO run in parallel and wait until first success.
+	var errors []error
+	for _, host := range connString.Hosts {
+		err := common.TestTCPConnection(ctx, host)
+		if err == nil {
+			return nil
+		}
+		errors = append(errors, err)
+	}
+	return trace.NewAggregate(errors...)
 }
 
 // HandleConnection processes the connection from MongoDB proxy coming

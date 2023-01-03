@@ -78,6 +78,9 @@ type Engine interface {
 	// HandleConnection proxies the connection received from the proxy to
 	// the particular database instance.
 	HandleConnection(context.Context, *Session) error
+	// TestConnection performs a quick test to confirm whether the database is
+	// accessible from the database agent.
+	TestConnection(context.Context, types.Database) error
 }
 
 // Users defines an interface for managing database users.

@@ -74,6 +74,12 @@ func (e *Engine) SendError(err error) {
 	}
 }
 
+// TestConnection performs a quick test to confirm whether the database is
+// accessible from the database agent.
+func (e *Engine) TestConnection(ctx context.Context, database types.Database) error {
+	return trace.Wrap(common.TestTCPConnection(ctx, database.GetURI()))
+}
+
 // HandleConnection processes the connection from MySQL proxy coming
 // over reverse tunnel.
 //

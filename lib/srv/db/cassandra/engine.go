@@ -28,6 +28,7 @@ import (
 	"github.com/datastax/go-cassandra-native-protocol/message"
 	"github.com/gravitational/trace"
 
+	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/api/types/events"
 	libevents "github.com/gravitational/teleport/lib/events"
 	"github.com/gravitational/teleport/lib/srv/db/cassandra/protocol"
@@ -82,6 +83,12 @@ func (e *Engine) InitializeConnection(clientConn net.Conn, sessionCtx *common.Se
 	e.clientConn = protocol.NewConn(clientConn)
 	e.sessionCtx = sessionCtx
 	return nil
+}
+
+// TestConnection performs a quick test to confirm whether the database is
+// accessible from the database agent.
+func (e *Engine) TestConnection(ctx context.Context, database types.Database) error {
+	return trace.Wrap(common.TestTCPConnection(ctx, database.GetURI()))
 }
 
 // HandleConnection processes the connection from Cassandra proxy coming
