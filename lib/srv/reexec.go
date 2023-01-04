@@ -58,7 +58,11 @@ const (
 	// it can continue after the parent process assigns a cgroup to the
 	// child process.
 	ContinueFile
-
+	// TerminateFile is used to communicate to the child process that
+	// the interactive terminal should be killed as the client ended the
+	// SSH session and without termination the terminal process will be assigned
+	// to pid 1 and "live forever". Killing the shell should not prevent processes
+	// preventing SIGHUP to be reassigned (ex. processes running with nohup).
 	TerminateFile
 	// X11File is used to communicate to the parent process that the child
 	// process has set up X11 forwarding.

@@ -235,6 +235,7 @@ func (t *terminal) Continue() {
 	}
 }
 
+// Termiante TODO(jakule) add comment and make sure that nohup processes survives.
 func (t *terminal) Terminate(ctx context.Context) error {
 	if err := t.terminalFD.Close(); err != nil {
 		if !errors.Is(err, os.ErrClosed) {
@@ -588,6 +589,7 @@ func (t *remoteTerminal) Wait() (*ExecResult, error) {
 // Continue does nothing for remote command execution.
 func (t *remoteTerminal) Continue() {}
 
+// Terminate does nothing for remote command execution.
 func (t *remoteTerminal) Terminate(_ context.Context) error {
 	return nil
 }
