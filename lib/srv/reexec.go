@@ -400,20 +400,36 @@ func RunCommand() (errw io.Writer, code int, err error) {
 	}
 
 	// Start the command.
-	err = cmd.Start()
-	if err != nil {
+	if err := cmd.Start(); err != nil {
 		return errorWriter, teleport.RemoteCommandFailure, trace.Wrap(err)
 	}
 
 	parkerCancel()
 
+	err = waitForShell(termiantefd, cmd)
+
+	if uaccEnabled {
+		uaccErr := uacc.Close(c.UaccMetadata.UtmpPath, c.UaccMetadata.WtmpPath, tty)
+		if uaccErr != nil {
+			return errorWriter, teleport.RemoteCommandFailure, trace.Wrap(uaccErr)
+		}
+	}
+
+	return io.Discard, exitCode(err), trace.Wrap(err)
+}
+
+func waitForShell(termiantefd *os.File, cmd *exec.Cmd) error {
 	terminateChan := make(chan error)
 
 	go func() {
 		buf := make([]byte, 1)
+		// Wait for the terminate file descriptor to be closed.
 		_, err := termiantefd.Read(buf)
 		if err == io.EOF {
+			// Kill the shell process
 			err = cmd.Process.Kill()
+		} else {
+			err = trace.Errorf("failed to read from terminate file: %w", err)
 		}
 		terminateChan <- err
 	}()
@@ -424,21 +440,13 @@ func RunCommand() (errw io.Writer, code int, err error) {
 		// occurred during shell execution or the shell exits with an error (like
 		// running exit 2), the shell will print an error if appropriate and return
 		// an exit code.
-		err = cmd.Wait()
+		err := cmd.Wait()
 
 		terminateChan <- err
 	}()
 
-	err = <-terminateChan
-
-	if uaccEnabled {
-		uaccErr := uacc.Close(c.UaccMetadata.UtmpPath, c.UaccMetadata.WtmpPath, tty)
-		if uaccErr != nil {
-			return errorWriter, teleport.RemoteCommandFailure, trace.Wrap(uaccErr)
-		}
-	}
-
-	return io.Discard, exitCode(err), trace.Wrap(err)
+	err := <-terminateChan
+	return err
 }
 
 // osWrapper wraps system calls, so we can replace them in tests.

@@ -18,6 +18,7 @@ package srv
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -25,6 +26,7 @@ import (
 	"strconv"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/creack/pty"
 	"github.com/gravitational/trace"
@@ -61,6 +63,9 @@ type Terminal interface {
 	// Continue will resume execution of the process after it completes its
 	// pre-processing routine (placed in a cgroup).
 	Continue()
+
+	// Terminate tries gracefully stop the terminal process.
+	Terminate(ctx context.Context) error
 
 	// Kill will force kill the terminal.
 	Kill(ctx context.Context) error
@@ -127,6 +132,8 @@ type terminal struct {
 	pty *os.File
 	tty *os.File
 
+	terminalFD *os.File
+
 	pid int
 
 	termType string
@@ -141,7 +148,8 @@ func newLocalTerminal(ctx *ServerContext) (*terminal, error) {
 		log: log.WithFields(log.Fields{
 			trace.Component: teleport.ComponentLocalTerm,
 		}),
-		ctx: ctx,
+		ctx:        ctx,
+		terminalFD: ctx.terminatew,
 	}
 
 	// Open PTY and corresponding TTY.
@@ -227,8 +235,41 @@ func (t *terminal) Continue() {
 	}
 }
 
-// Kill will force kill the terminal.
-func (t *terminal) Kill(ctx context.Context) error {
+func (t *terminal) Terminate(ctx context.Context) error {
+	if err := t.terminalFD.Close(); err != nil {
+		if !errors.Is(err, os.ErrClosed) {
+			t.log.WithError(err).Debug("Failed to close the shell file descriptor")
+		}
+	}
+
+	pid := t.PID()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		proc, err := os.FindProcess(pid)
+		if err != nil {
+			t.log.WithError(err).Debug("Failed to find the shell process")
+			break
+		}
+
+		if err := proc.Signal(syscall.Signal(0)); errors.Is(err, os.ErrProcessDone) {
+			t.log.Debugf("Terminal has already been stopped")
+			return nil
+		}
+
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	return nil
+}
+
+// Kill will force kill the child Teleport process.
+func (t *terminal) Kill(_ context.Context) error {
 	if t.cmd != nil && t.cmd.Process != nil {
 		if err := t.cmd.Process.Kill(); err != nil {
 			if err.Error() != "os: process already finished" {
@@ -546,6 +587,10 @@ func (t *remoteTerminal) Wait() (*ExecResult, error) {
 
 // Continue does nothing for remote command execution.
 func (t *remoteTerminal) Continue() {}
+
+func (t *remoteTerminal) Terminate(_ context.Context) error {
+	return nil
+}
 
 func (t *remoteTerminal) Kill(ctx context.Context) error {
 	err := t.session.Signal(ctx, ssh.SIGKILL)
