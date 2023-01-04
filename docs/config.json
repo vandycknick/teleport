@@ -805,7 +805,8 @@
             },
             {
               "title": "AWS DynamoDB",
-              "slug": "/database-access/guides/dynamodb/"
+              "slug": "/database-access/guides/aws-dynamodb/",
+              "forScopes": ["oss", "enterprise", "cloud"]
             },
             {
               "title": "AWS Keyspaces (Apache Cassandra)",
