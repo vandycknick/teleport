@@ -149,7 +149,7 @@ func newLocalTerminal(ctx *ServerContext) (*terminal, error) {
 			trace.Component: teleport.ComponentLocalTerm,
 		}),
 		ctx:        ctx,
-		terminalFD: ctx.terminatew,
+		terminalFD: ctx.killShellw,
 	}
 
 	// Open PTY and corresponding TTY.

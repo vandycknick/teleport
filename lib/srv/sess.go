@@ -652,10 +652,12 @@ func (s *session) haltTerminal() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := s.term.Terminate(ctx); err == nil {
-		return
-	} else {
+	if err := s.term.Terminate(ctx); err != nil {
 		s.log.WithError(err).Debug("Failed to terminate the shell")
+	} else {
+		// Return before we send SIGKILL to the child process, as doing that
+		// could interrupt the "graceful shutdown" process.
+		return
 	}
 
 	if err := s.term.Kill(context.TODO()); err != nil {

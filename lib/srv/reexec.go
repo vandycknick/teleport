@@ -888,7 +888,7 @@ func ConfigureCommand(ctx *ServerContext, extraFiles ...*os.File) (*exec.Cmd, er
 		ExtraFiles: []*os.File{
 			ctx.cmdr,
 			ctx.contr,
-			ctx.terminater,
+			ctx.killShellr,
 			ctx.x11rdyw,
 		},
 	}

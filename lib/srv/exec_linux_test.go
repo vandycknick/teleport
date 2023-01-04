@@ -168,7 +168,7 @@ func TestContinue(t *testing.T) {
 	// requested program.
 	err = scx.contw.Close()
 	require.NoError(t, err)
-	err = scx.terminatew.Close()
+	err = scx.killShellw.Close()
 	require.NoError(t, err)
 
 	// Program should have executed now. If the complete signal has not come
