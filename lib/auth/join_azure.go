@@ -81,14 +81,26 @@ type azureRegisterConfig struct {
 	vmClient azure.VirtualMachinesClient
 }
 
-func verifyFuncFromOIDCVerifier(verifier *oidc.IDTokenVerifier) azureVerifyTokenFunc {
+func azureVerifyFuncFromOIDCVerifier(cfg *oidc.Config) azureVerifyTokenFunc {
 	return func(ctx context.Context, rawIDToken string) (*accessTokenClaims, error) {
-		token, err := verifier.Verify(ctx, rawIDToken)
+		token, err := jwt.ParseSigned(rawIDToken)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		var unverifiedClaims accessTokenClaims
+		if err := token.UnsafeClaimsWithoutVerification(&unverifiedClaims); err != nil {
+			return nil, trace.Wrap(err)
+		}
+		provider, err := oidc.NewProvider(ctx, fmt.Sprintf("https://sts.windows.net/%v/", unverifiedClaims.TenantID))
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		verifiedToken, err := provider.Verifier(cfg).Verify(ctx, rawIDToken)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
 		var tokenClaims accessTokenClaims
-		if err := token.Claims(&tokenClaims); err != nil {
+		if err := verifiedToken.Claims(&tokenClaims); err != nil {
 			return nil, trace.Wrap(err)
 		}
 		return &tokenClaims, nil
@@ -96,18 +108,15 @@ func verifyFuncFromOIDCVerifier(verifier *oidc.IDTokenVerifier) azureVerifyToken
 }
 
 func (cfg *azureRegisterConfig) CheckAndSetDefaults(ctx context.Context) error {
+	if cfg.clock == nil {
+		cfg.clock = clockwork.NewRealClock()
+	}
 	if cfg.verify == nil {
-		provider, err := oidc.NewProvider(ctx, "https://login.microsoftonline.com/common/")
-		if err != nil {
-			return trace.Wrap(err)
-		}
 		oidcConfig := &oidc.Config{
 			SkipClientIDCheck: true,
+			Now:               cfg.clock.Now,
 		}
-		if cfg.clock != nil {
-			oidcConfig.Now = cfg.clock.Now
-		}
-		cfg.verify = verifyFuncFromOIDCVerifier(provider.Verifier(oidcConfig))
+		cfg.verify = azureVerifyFuncFromOIDCVerifier(oidcConfig)
 	}
 
 	if cfg.certs == nil {
@@ -161,9 +170,14 @@ func parseAndVerifyAttestedData(adBytes []byte, challenge string, certs []*x509.
 	if err != nil {
 		return "", trace.Wrap(err)
 	}
+	fixAzureSigningAlgorithm(p7)
 
-	p7.Certificates = certs
-	if err := p7.Verify(); err != nil {
+	pool := x509.NewCertPool()
+	for _, cert := range certs {
+		pool.AddCert(cert)
+	}
+
+	if err := p7.VerifyWithChain(pool); err != nil {
 		return "", trace.Wrap(err)
 	}
 
@@ -319,4 +333,14 @@ func (a *Server) RegisterUsingAzureMethod(ctx context.Context, challengeResponse
 
 	certs, err := a.generateCerts(ctx, provisionToken, req.RegisterUsingTokenRequest)
 	return certs, trace.Wrap(err)
+}
+
+// fixAzureSigningAlgorithm fixes a mismatch between the object IDs of the
+// hashing algorithm sent by Azure vs the ones expected by the pkcs7 library.
+func fixAzureSigningAlgorithm(p7 *pkcs7.PKCS7) {
+	for i, signer := range p7.Signers {
+		if signer.DigestAlgorithm.Algorithm.Equal(pkcs7.OIDEncryptionAlgorithmRSASHA256) {
+			p7.Signers[i].DigestAlgorithm.Algorithm = pkcs7.OIDDigestAlgorithmSHA256
+		}
+	}
 }
