@@ -297,7 +297,7 @@ convenience while setting up your local demo, you can run the following command
 to create a dynamic configuration resource that disables MFA for your demo user:
 
 ```code
-$ kubectl exec -it statefulset/teleport-cluster-auth -- bash -c "cat<<EOF>>/home/cp.yaml
+$ kubectl exec -i statefulset/teleport-cluster-auth -- bash -c "cat<<EOF>>/home/cp.yaml
 kind: cluster_auth_preference
 version: v2
 metadata:
