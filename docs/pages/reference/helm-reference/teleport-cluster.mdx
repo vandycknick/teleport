@@ -21,7 +21,7 @@ The `teleport-cluster` chart runs three Teleport services split in two sets of p
 <Admonition type="tip" title="Additional Kubernetes Clusters and Teleport Services">
 If you want to provide access to resources like Databases, Applications or other
 Kubernetes clusters than the one hosting the Teleport cluster, you should use the
-[`teleport-kube-agent` Helm chart](../teleport-kube-agent.mdx).
+[`teleport-kube-agent` Helm chart](teleport-kube-agent.mdx).
 
 - `teleport-cluster` hosts a Teleport cluster, you should only need one.
 - `teleport-kube-agent` connects to an existing Teleport cluster and exposes configured resources.
