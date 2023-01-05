@@ -18,7 +18,8 @@ The main changes brought by the version 12 of the `teleport-cluster` chart are:
 - `custom` mode is removed as it was broken by the topology change.
   It is replaced by a new configuration override mechanism allowing you to pass arbitrary Teleport configuration.
 - the value `standalone.storage` that was previously deprecated in favor of `persistence` was removed.
-- The chart can now be scaled up in `standalone` mode.
+- The chart can now be scaled up in `standalone` mode. Proxy replication requires
+  a TLS certificate; Auth replication require using [HA storage backends](../../reference/backends.mdx).
 - The chart has always been versioned with Teleport but was often compatible with the previous Teleport major version.
   This is not the case for v12. Using the chart v12 requires at least Teleport v12.
 
@@ -28,10 +29,9 @@ The upgrade path mainly depends on the `chartMode` used. If you used a "managed"
 it should be relatively straightforward. If you relied on the `custom` chart mode, you will have to perform
 configuration changes.
 
-In any case:
-- backup the cluster content prior upgrading
-- test the upgrade in a test environment
-
+Before upgrading, always:
+- [backup the cluster content](../../management/operations/backup-restore.mdx)
+- test the upgrade in a non-production environment
 
 <Admonition type="warning">
   During the upgrade, Kubernetes will delete existing deployments and create new ones.
