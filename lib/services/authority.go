@@ -44,7 +44,10 @@ import (
 // CertAuthoritiesEquivalent checks if a pair of certificate authority resources are equivalent.
 // This differs from normal equality only in that resource IDs are ignored.
 func CertAuthoritiesEquivalent(lhs, rhs types.CertAuthority) bool {
-	return cmp.Equal(lhs, rhs, cmpopts.IgnoreFields(types.Metadata{}, "ID"))
+	return cmp.Equal(lhs, rhs,
+		ignoreProtoXXXFields(),
+		cmpopts.IgnoreFields(types.Metadata{}, "ID"),
+	)
 }
 
 // ValidateCertAuthority validates the CertAuthority
@@ -296,6 +299,13 @@ type UserCertParams struct {
 	ConnectionDiagnosticID string
 	// PrivateKeyPolicy is the private key policy supported by this certificate.
 	PrivateKeyPolicy keys.PrivateKeyPolicy
+	// DeviceID is the trusted device identifier.
+	DeviceID string
+	// DeviceAssetTag is the device inventory identifier.
+	DeviceAssetTag string
+	// DeviceCredentialID is the identifier for the credential used by the device
+	// to authenticate itself.
+	DeviceCredentialID string
 }
 
 // CheckAndSetDefaults checks the user certificate parameters
