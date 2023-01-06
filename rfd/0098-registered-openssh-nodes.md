@@ -106,7 +106,7 @@ The following Teleport node features won't work with registered OpenSSH nodes:
 - Dynamic labels
 - Outbound persistent tunnels to Proxies
 
-Due to this and other potential future differences, `tsh ls` and the node listing on the web UI should be updated to display if nodes are registered OpenSSH nodes, or simply 'agentless'.
+Due to this and other potential future differences, `tsh ls` and the node listing on the web UI should be updated to display if nodes are registered OpenSSH nodes or Teleport agent nodes.
 
 ### Future work
 
