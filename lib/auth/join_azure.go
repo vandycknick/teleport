@@ -39,6 +39,8 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
+const azureAccessTokenAudience = "https://management.azure.com/"
+
 type signedAttestedData struct {
 	Encoding  string `json:"encoding"`
 	Signature string `json:"signature"`
@@ -113,8 +115,8 @@ func (cfg *azureRegisterConfig) CheckAndSetDefaults(ctx context.Context) error {
 	}
 	if cfg.verify == nil {
 		oidcConfig := &oidc.Config{
-			SkipClientIDCheck: true,
-			Now:               cfg.clock.Now,
+			ClientID: azureAccessTokenAudience,
+			Now:      cfg.clock.Now,
 		}
 		cfg.verify = azureVerifyFuncFromOIDCVerifier(oidcConfig)
 	}
@@ -238,7 +240,7 @@ func (a *Server) checkAzureRequest(ctx context.Context, challenge string, req *p
 
 	expectedClaims := jwt.Expected{
 		Issuer:   expectedIssuer,
-		Audience: jwt.Audience{"https://management.azure.com/"},
+		Audience: jwt.Audience{azureAccessTokenAudience},
 		Time:     requestStart,
 	}
 
@@ -331,7 +333,7 @@ func (a *Server) RegisterUsingAzureMethod(ctx context.Context, challengeResponse
 		return nil, trace.Wrap(err)
 	}
 
-	certs, err := a.generateCerts(ctx, provisionToken, req.RegisterUsingTokenRequest)
+	certs, err := a.generateCerts(ctx, provisionToken, req.RegisterUsingTokenRequest, nil)
 	return certs, trace.Wrap(err)
 }
 

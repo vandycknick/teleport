@@ -31,9 +31,10 @@ import (
 	"github.com/gravitational/teleport/api/client/proto"
 )
 
-const iamJoinRequestTimeout = time.Minute
-
-const azureJoinRequestTimeout = time.Minute // TODO: should this and iamJoinRequestTimeout be merged?
+const (
+	iamJoinRequestTimeout   = time.Minute
+	azureJoinRequestTimeout = time.Minute
+)
 
 type joinServiceClient interface {
 	RegisterUsingIAMMethod(ctx context.Context, challengeResponse client.RegisterIAMChallengeResponseFunc) (*proto.Certs, error)

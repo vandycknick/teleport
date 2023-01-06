@@ -96,7 +96,7 @@ func makeToken(resourceID string, issueTime time.Time) (string, error) {
 	claims := accessTokenClaims{
 		Claims: jwt.Claims{
 			Issuer:    "https://sts.windows.net/test-tenant-id/",
-			Audience:  []string{"https://management.azure.com/"},
+			Audience:  []string{azureAccessTokenAudience},
 			Subject:   "test",
 			IssuedAt:  jwt.NewNumericDate(issueTime),
 			NotBefore: jwt.NewNumericDate(issueTime),

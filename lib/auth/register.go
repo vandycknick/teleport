@@ -357,8 +357,8 @@ func registerThroughAuth(token string, params RegisterParams) (*proto.Certs, err
 
 	var certs *proto.Certs
 	switch params.JoinMethod {
+	// IAM and Azure methods use unique gRPC endpoints
 	case types.JoinMethodIAM:
-		// IAM method uses unique gRPC endpoint
 		certs, err = registerUsingIAMMethod(client, token, params)
 	case types.JoinMethodAzure:
 		certs, err = registerUsingAzureMethod(client, token, params)
