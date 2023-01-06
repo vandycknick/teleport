@@ -222,7 +222,6 @@ func (m *RegisterUsingAzureMethodRequest) GetAccessToken() string {
 
 // RegisterUsingAzureMethodResponse is a stream response and will contain either
 // a Challenge or signed Certs to join the cluster.
-// TODO: decide if this should be merged with RegisterUsingIAMMethodResponse.
 type RegisterUsingAzureMethodResponse struct {
 	// Challenge is a crypto-random string that should be included in the signed
 	// sts:GetCallerIdentity request.

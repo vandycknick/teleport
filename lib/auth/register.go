@@ -622,7 +622,7 @@ func registerUsingAzureMethod(client joinServiceClient, token string, params Reg
 	certs, err := client.RegisterUsingAzureMethod(ctx, func(challenge string) (*proto.RegisterUsingAzureMethodRequest, error) {
 		imds := azure.NewInstanceMetadataClient()
 		if !imds.IsAvailable(ctx) {
-			return nil, trace.AccessDenied("Could not reach instance metadata. Is Teleport running on an Azure VM?")
+			return nil, trace.AccessDenied("could not reach instance metadata. Is Teleport running on an Azure VM?")
 		}
 		ad, err := imds.GetAttestedData(ctx, challenge)
 		if err != nil {

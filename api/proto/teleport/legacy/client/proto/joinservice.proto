@@ -59,7 +59,6 @@ message RegisterUsingAzureMethodRequest {
 
 // RegisterUsingAzureMethodResponse is a stream response and will contain either
 // a Challenge or signed Certs to join the cluster.
-// TODO: decide if this should be merged with RegisterUsingIAMMethodResponse.
 message RegisterUsingAzureMethodResponse {
   // Challenge is a crypto-random string that should be included in the signed
   // sts:GetCallerIdentity request.

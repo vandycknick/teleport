@@ -109,21 +109,16 @@ func (a *Server) RegisterUsingToken(ctx context.Context, req *types.RegisterUsin
 	}
 
 	var joinAttributeSrc joinAttributeSourcer
-	switch a.tokenJoinMethod(ctx, req.Token) {
+	switch method := a.tokenJoinMethod(ctx, req.Token); method {
 	case types.JoinMethodEC2:
 		if err := a.checkEC2JoinRequest(ctx, req); err != nil {
 			return nil, trace.Wrap(err)
 		}
-	case types.JoinMethodIAM:
-		// IAM join method must use the gRPC RegisterUsingIAMMethod
-		return nil, trace.AccessDenied("this token is only valid for the IAM " +
-			"join method but the node has connected to the wrong endpoint, make " +
-			"sure your node is configured to use the IAM join method")
-	case types.JoinMethodAzure:
-		// Azure join method must use the gRPC RegisterUsingAzureMethod
-		return nil, trace.AccessDenied("this token is only valid for the Azure " +
-			"join method but the node has connected to the wrong endpoint, make " +
-			"sure your node is configured to use the Azure join method")
+	case types.JoinMethodIAM, types.JoinMethodAzure:
+		// IAM and Azure join methods must use the gRPC RegisterUsingIAMMethod
+		return nil, trace.AccessDenied("this token is only valid for the %s "+
+			"join method but the node has connected to the wrong endpoint, make "+
+			"sure your node is configured to use the %s join method", method, method)
 	case types.JoinMethodGitHub:
 		claims, err := a.checkGitHubJoinRequest(ctx, req)
 		if err != nil {

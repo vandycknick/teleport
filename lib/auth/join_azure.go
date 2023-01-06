@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Gravitational, Inc.
+Copyright 2023 Gravitational, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -152,7 +152,8 @@ func withVMClient(vmClient azure.VirtualMachinesClient) azureRegisterOption {
 }
 
 // parseAndVeryAttestedData verifies that an attested data document was signed
-// by Azure.
+// by Azure. If verification is successfull, it returns the ID of the VM that
+// produced the document.
 func parseAndVerifyAttestedData(adBytes []byte, challenge string, certs []*x509.Certificate) (string, error) {
 	var signedAD signedAttestedData
 	if err := json.Unmarshal(adBytes, &signedAD); err != nil {
