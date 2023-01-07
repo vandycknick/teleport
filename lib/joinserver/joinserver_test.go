@@ -229,6 +229,69 @@ func TestJoinServiceGRPCServer_RegisterUsingIAMMethod(t *testing.T) {
 	}
 }
 
+func TestJoinServiceGRPCServer_RegisterUsingAzureMethod(t *testing.T) {
+	t.Parallel()
+	testPack := newTestPack(t)
+
+	testCases := []struct {
+		desc                 string
+		challenge            string
+		challengeResponse    *proto.RegisterUsingAzureMethodRequest
+		challengeResponseErr error
+		authErr              error
+		certs                *proto.Certs
+	}{
+		{
+			desc:              "pass case",
+			challenge:         "foo",
+			challengeResponse: &proto.RegisterUsingAzureMethodRequest{AttestedData: []byte("bar"), AccessToken: "baz"},
+			certs:             &proto.Certs{SSH: []byte("qux")},
+		},
+		{
+			desc:              "auth error",
+			challenge:         "foo",
+			challengeResponse: &proto.RegisterUsingAzureMethodRequest{AttestedData: []byte("bar"), AccessToken: "baz"},
+			authErr:           trace.AccessDenied("test auth error"),
+		},
+		{
+			desc:                 "challenge response error",
+			challenge:            "foo",
+			challengeResponseErr: trace.BadParameter("test challenge error"),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			testPack.mockAuthServer.sendChallenge = tc.challenge
+			testPack.mockAuthServer.returnCerts = tc.certs
+			testPack.mockAuthServer.returnError = tc.authErr
+			challengeResponder := func(challenge string) (*proto.RegisterUsingAzureMethodRequest, error) {
+				require.Equal(t, tc.challenge, challenge)
+				return tc.challengeResponse, tc.challengeResponseErr
+			}
+
+			for suffix, clt := range map[string]*client.JoinServiceClient{
+				"_auth":  testPack.authClient,
+				"_proxy": testPack.proxyClient,
+			} {
+				t.Run(tc.desc+suffix, func(t *testing.T) {
+					certs, err := clt.RegisterUsingAzureMethod(context.Background(), challengeResponder)
+					if tc.challengeResponseErr != nil {
+						require.Equal(t, tc.challengeResponseErr, err)
+						return
+					}
+					if tc.authErr != nil {
+						require.Contains(t, err.Error(), tc.authErr.Error())
+						return
+					}
+					require.NoError(t, err)
+					require.Equal(t, tc.certs, certs)
+					require.Equal(t, tc.challengeResponse, testPack.mockAuthServer.gotAzureChallengeResponse)
+				})
+			}
+		})
+	}
+}
+
 func TestTimeout(t *testing.T) {
 	t.Parallel()
 
