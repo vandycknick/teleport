@@ -2142,6 +2142,11 @@
       "source": "/management/guides/elastic-stack/",
       "destination": "/management/export-audit-events/elastic-stack/",
       "permanent": true
+    },
+    {
+      "source": "/database-access/guides/dynamodb/",
+      "destination": "/application-access/guides/dynamodb/",
+      "permanent": true
     }
   ]
 }
