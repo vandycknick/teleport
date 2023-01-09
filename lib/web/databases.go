@@ -17,15 +17,21 @@ limitations under the License.
 package web
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/gravitational/trace"
 	"github.com/julienschmidt/httprouter"
 
+	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/api/utils/tlsutils"
+	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/httplib"
 	"github.com/gravitational/teleport/lib/reversetunnel"
+	dbiam "github.com/gravitational/teleport/lib/srv/db/common/iam"
 	"github.com/gravitational/teleport/lib/web/ui"
 )
 
@@ -36,6 +42,12 @@ type createDatabaseRequest struct {
 	Labels   []ui.Label `json:"labels,omitempty"`
 	Protocol string     `json:"protocol,omitempty"`
 	URI      string     `json:"uri,omitempty"`
+	AWSRDS   *awsRDS    `json:"awsRds,omitempty"`
+}
+
+type awsRDS struct {
+	AccountID  string `json:"accountId,omitempty"`
+	ResourceID string `json:"resourceId,omitempty"`
 }
 
 func (r *createDatabaseRequest) checkAndSetDefaults() error {
@@ -51,11 +63,20 @@ func (r *createDatabaseRequest) checkAndSetDefaults() error {
 		return trace.BadParameter("missing uri")
 	}
 
+	if r.AWSRDS != nil {
+		if r.AWSRDS.ResourceID == "" {
+			return trace.BadParameter("missing aws rds field resource id")
+		}
+		if r.AWSRDS.AccountID == "" {
+			return trace.BadParameter("missing aws rds field account id")
+		}
+	}
+
 	return nil
 }
 
 // handleDatabaseCreate creates a database's metadata.
-func (h *Handler) handleDatabaseCreate(w http.ResponseWriter, r *http.Request, p httprouter.Params, ctx *SessionContext, site reversetunnel.RemoteSite) (interface{}, error) {
+func (h *Handler) handleDatabaseCreate(w http.ResponseWriter, r *http.Request, p httprouter.Params, sctx *SessionContext, site reversetunnel.RemoteSite) (interface{}, error) {
 	var req *createDatabaseRequest
 	if err := httplib.ReadJSON(r, &req); err != nil {
 		return nil, trace.Wrap(err)
@@ -70,20 +91,30 @@ func (h *Handler) handleDatabaseCreate(w http.ResponseWriter, r *http.Request, p
 		labels[label.Name] = label.Value
 	}
 
+	dbSpec := types.DatabaseSpecV3{
+		Protocol: req.Protocol,
+		URI:      req.URI,
+	}
+
+	if req.AWSRDS != nil {
+		dbSpec.AWS = types.AWS{
+			AccountID: req.AWSRDS.AccountID,
+			RDS: types.RDS{
+				ResourceID: req.AWSRDS.ResourceID,
+			},
+		}
+	}
+
 	database, err := types.NewDatabaseV3(
 		types.Metadata{
 			Name:   req.Name,
 			Labels: labels,
-		},
-		types.DatabaseSpecV3{
-			Protocol: req.Protocol,
-			URI:      req.URI,
-		})
+		}, dbSpec)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 
-	clt, err := ctx.GetUserClient(site)
+	clt, err := sctx.GetUserClient(r.Context(), site)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -92,7 +123,16 @@ func (h *Handler) handleDatabaseCreate(w http.ResponseWriter, r *http.Request, p
 		return nil, trace.Wrap(err)
 	}
 
-	return ui.MakeDatabase(database), nil
+	accessChecker, err := sctx.GetUserAccessChecker()
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	dbNames, dbUsers, err := getDatabaseUsersAndNames(accessChecker)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	return ui.MakeDatabase(database, dbUsers, dbNames), nil
 }
 
 // updateDatabaseRequest contains some updatable fields of a database resource.
@@ -113,7 +153,7 @@ func (r *updateDatabaseRequest) checkAndSetDefaults() error {
 }
 
 // handleDatabaseUpdate updates the database
-func (h *Handler) handleDatabaseUpdate(w http.ResponseWriter, r *http.Request, p httprouter.Params, ctx *SessionContext, site reversetunnel.RemoteSite) (interface{}, error) {
+func (h *Handler) handleDatabaseUpdate(w http.ResponseWriter, r *http.Request, p httprouter.Params, sctx *SessionContext, site reversetunnel.RemoteSite) (interface{}, error) {
 	databaseName := p.ByName("database")
 	if databaseName == "" {
 		return nil, trace.BadParameter("a database name is required")
@@ -128,7 +168,7 @@ func (h *Handler) handleDatabaseUpdate(w http.ResponseWriter, r *http.Request, p
 		return nil, trace.Wrap(err)
 	}
 
-	clt, err := ctx.GetUserClient(site)
+	clt, err := sctx.GetUserClient(r.Context(), site)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -144,5 +184,86 @@ func (h *Handler) handleDatabaseUpdate(w http.ResponseWriter, r *http.Request, p
 		return nil, trace.Wrap(err)
 	}
 
-	return ui.MakeDatabase(database), nil
+	return ui.MakeDatabase(database, nil /* dbUsers */, nil /* dbNames */), nil
+}
+
+// databaseIAMPolicyResponse is the response type for handleDatabaseGetIAMPolicy.
+type databaseIAMPolicyResponse struct {
+	// Type is the type of the IAM policy.
+	Type string `json:"type"`
+	// AWS contains the IAM policy for AWS-hosted databases.
+	AWS *databaseIAMPolicyAWS `json:"aws,omitempty"`
+}
+
+// databaseIAMPolicyAWS contains IAM policy for AWS-hosted databases.
+type databaseIAMPolicyAWS struct {
+	// PolicyDocument is the AWS IAM policy document.
+	PolicyDocument string `json:"policy_document"`
+	// Placeholders are placeholders found in the policy document.
+	Placeholders []string `json:"placeholders,omitempty"`
+}
+
+// handleDatabaseGetIAMPolicy returns the required IAM policy for database.
+func (h *Handler) handleDatabaseGetIAMPolicy(w http.ResponseWriter, r *http.Request, p httprouter.Params, sctx *SessionContext, site reversetunnel.RemoteSite) (interface{}, error) {
+	databaseName := p.ByName("database")
+	if databaseName == "" {
+		return nil, trace.BadParameter("missing database name")
+	}
+
+	clt, err := sctx.GetUserClient(r.Context(), site)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	database, err := fetchDatabaseWithName(r.Context(), clt, r, databaseName)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	switch {
+	case database.IsAWSHosted():
+		policy, placeholders, err := dbiam.GetAWSPolicyDocument(database)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		policyJSON, err := json.Marshal(policy)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return &databaseIAMPolicyResponse{
+			Type: "aws",
+			AWS: &databaseIAMPolicyAWS{
+				PolicyDocument: string(policyJSON),
+				Placeholders:   placeholders,
+			},
+		}, nil
+
+	default:
+		return nil, trace.BadParameter("IAM policy not supported for database type %q", database.GetType())
+	}
+}
+
+// fetchDatabaseWithName fetch a database with provided database name.
+func fetchDatabaseWithName(ctx context.Context, clt resourcesAPIGetter, r *http.Request, databaseName string) (types.Database, error) {
+	resp, err := clt.ListResources(ctx, proto.ListResourcesRequest{
+		Limit:               defaults.MaxIterationLimit,
+		ResourceType:        types.KindDatabaseServer,
+		PredicateExpression: fmt.Sprintf(`name == "%s"`, databaseName),
+		UseSearchAsRoles:    r.URL.Query().Get("searchAsRoles") == "yes",
+	})
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	servers, err := types.ResourcesWithLabels(resp.Resources).AsDatabaseServers()
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	switch len(servers) {
+	case 0:
+		return nil, trace.NotFound("database %q not found", databaseName)
+	default:
+		return servers[0].GetDatabase(), nil
+	}
 }

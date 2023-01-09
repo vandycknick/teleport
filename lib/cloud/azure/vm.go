@@ -47,6 +47,12 @@ type VirtualMachine struct {
 	ID string `json:"id,omitempty"`
 	// Name resource name.
 	Name string `json:"name,omitempty"`
+	// Subscription is the Azure subscription the VM is in.
+	Subscription string
+	// ResourceGroup is the resource group the VM is in.
+	ResourceGroup string
+	// VMID is the VM's ID.
+	VMID string
 	// Identities are the identities associated with the resource.
 	Identities []Identity
 }
@@ -101,10 +107,18 @@ func (c *vmClient) Get(ctx context.Context, resourceID string) (*VirtualMachine,
 		}
 	}
 
+	var vmID string
+	if resp.Properties != nil {
+		vmID = *resp.Properties.VMID
+	}
+
 	return &VirtualMachine{
-		ID:         *resp.ID,
-		Name:       *resp.Name,
-		Identities: identities,
+		ID:            *resp.ID,
+		Name:          *resp.Name,
+		Subscription:  parsedResourceID.SubscriptionID,
+		ResourceGroup: parsedResourceID.ResourceGroupName,
+		VMID:          vmID,
+		Identities:    identities,
 	}, nil
 }
 

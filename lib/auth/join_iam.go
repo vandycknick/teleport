@@ -20,7 +20,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"io"
@@ -36,12 +35,12 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/coreos/go-semver/semver"
 	"github.com/gravitational/trace"
+	"golang.org/x/exp/slices"
 
 	"github.com/gravitational/teleport"
 	"github.com/gravitational/teleport/api/client"
 	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/api/types"
-	apiutils "github.com/gravitational/teleport/api/utils"
 	cloudaws "github.com/gravitational/teleport/lib/cloud/aws"
 	"github.com/gravitational/teleport/lib/utils/aws"
 )
@@ -76,7 +75,7 @@ var (
 // against a static list of known valid endpoints. We will need to update this
 // list as AWS adds new regions.
 func validateSTSHost(stsHost string, cfg *iamRegisterConfig) error {
-	valid := apiutils.SliceContainsStr(validSTSEndpoints, stsHost)
+	valid := slices.Contains(validSTSEndpoints, stsHost)
 	if !valid {
 		return trace.AccessDenied("IAM join request uses unknown STS host %q. "+
 			"This could mean that the Teleport Node attempting to join the cluster is "+
@@ -89,7 +88,7 @@ func validateSTSHost(stsHost string, cfg *iamRegisterConfig) error {
 			stsHost, validSTSEndpoints)
 	}
 
-	if cfg.fips && !apiutils.SliceContainsStr(fipsSTSEndpoints, stsHost) {
+	if cfg.fips && !slices.Contains(fipsSTSEndpoints, stsHost) {
 		if cfg.authVersion.LessThan(semver.Version{Major: 12}) {
 			log.Warnf("Non-FIPS STS endpoint (%s) was used by a node joining "+
 				"the cluster with the IAM join method. "+
@@ -149,7 +148,7 @@ func validateSTSIdentityRequest(req *http.Request, challenge string, cfg *iamReg
 	if err != nil {
 		return trace.Wrap(err)
 	}
-	if !apiutils.SliceContainsStr(sigV4.SignedHeaders, challengeHeaderKey) {
+	if !slices.Contains(sigV4.SignedHeaders, challengeHeaderKey) {
 		return trace.AccessDenied("sts identity request auth header %q does not include "+
 			challengeHeaderKey+" as a signed header", authHeader)
 	}
@@ -333,15 +332,9 @@ func (a *Server) checkIAMRequest(ctx context.Context, challenge string, req *pro
 	return nil
 }
 
-func generateChallenge() (string, error) {
-	// read 32 crypto-random bytes to generate the challenge
-	challengeRawBytes := make([]byte, 32)
-	if _, err := rand.Read(challengeRawBytes); err != nil {
-		return "", trace.Wrap(err)
-	}
-
-	// encode the challenge to base64 so it can be sent in an HTTP header
-	return base64.RawStdEncoding.EncodeToString(challengeRawBytes), nil
+func generateIAMChallenge() (string, error) {
+	challenge, err := generateChallenge(base64.RawStdEncoding, 32)
+	return challenge, trace.Wrap(err)
 }
 
 type iamRegisterConfig struct {
@@ -376,7 +369,7 @@ func withFips(fips bool) iamRegisterOption {
 // The caller must provide a ChallengeResponseFunc which returns a
 // *types.RegisterUsingTokenRequest with a signed sts:GetCallerIdentity request
 // including the challenge as a signed header.
-func (a *Server) RegisterUsingIAMMethod(ctx context.Context, challengeResponse client.RegisterChallengeResponseFunc, opts ...iamRegisterOption) (*proto.Certs, error) {
+func (a *Server) RegisterUsingIAMMethod(ctx context.Context, challengeResponse client.RegisterIAMChallengeResponseFunc, opts ...iamRegisterOption) (*proto.Certs, error) {
 	cfg := defaultIAMRegisterConfig(a.fips)
 	for _, opt := range opts {
 		opt(cfg)
@@ -387,7 +380,7 @@ func (a *Server) RegisterUsingIAMMethod(ctx context.Context, challengeResponse c
 		return nil, trace.BadParameter("logic error: client address was not set")
 	}
 
-	challenge, err := generateChallenge()
+	challenge, err := generateIAMChallenge()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -414,7 +407,11 @@ func (a *Server) RegisterUsingIAMMethod(ctx context.Context, challengeResponse c
 		return nil, trace.Wrap(err)
 	}
 
-	certs, err := a.generateCerts(ctx, provisionToken, req.RegisterUsingTokenRequest)
+	if req.RegisterUsingTokenRequest.Role == types.RoleBot {
+		certs, err := a.generateCertsBot(ctx, provisionToken, req.RegisterUsingTokenRequest, nil)
+		return certs, trace.Wrap(err)
+	}
+	certs, err := a.generateCerts(ctx, provisionToken, req.RegisterUsingTokenRequest, nil)
 	return certs, trace.Wrap(err)
 }
 
@@ -490,7 +487,7 @@ func newSTSClient(ctx context.Context, cfg *stsIdentityRequestConfig) (*sts.STS,
 
 	stsClient := sts.New(sess)
 
-	if apiutils.SliceContainsStr(globalSTSEndpoints, strings.TrimPrefix(stsClient.Endpoint, "https://")) {
+	if slices.Contains(globalSTSEndpoints, strings.TrimPrefix(stsClient.Endpoint, "https://")) {
 		// If the caller wants to use the regional endpoint but it was not resolved
 		// from the environment, attempt to find the region from the EC2 IMDS
 		if cfg.regionalEndpointOption == endpoints.RegionalSTSEndpoint {
@@ -507,7 +504,7 @@ func newSTSClient(ctx context.Context, cfg *stsIdentityRequestConfig) (*sts.STS,
 	}
 
 	if cfg.fipsEndpointOption == endpoints.FIPSEndpointStateEnabled &&
-		!apiutils.SliceContainsStr(validSTSEndpoints, strings.TrimPrefix(stsClient.Endpoint, "https://")) {
+		!slices.Contains(validSTSEndpoints, strings.TrimPrefix(stsClient.Endpoint, "https://")) {
 		// The AWS SDK will generate invalid endpoints when attempting to
 		// resolve the FIPS endpoint for a region which does not have one.
 		// In this case, try to use the FIPS endpoint in us-east-1. This should

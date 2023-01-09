@@ -98,7 +98,7 @@ func (client *InstanceMetadataClient) selectVersion(ctx context.Context) error {
 }
 
 // getRawMetadata gets the raw metadata from a specified path.
-func (client *InstanceMetadataClient) getRawMetadata(ctx context.Context, route string) ([]byte, error) {
+func (client *InstanceMetadataClient) getRawMetadata(ctx context.Context, route string, queryParams map[string]string) ([]byte, error) {
 	httpClient, err := defaults.HTTPClient()
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -110,10 +110,12 @@ func (client *InstanceMetadataClient) getRawMetadata(ctx context.Context, route 
 
 	req.Header.Add("Metadata", "True")
 	query := req.URL.Query()
-	query.Add("format", "json")
 	apiVersion := client.GetAPIVersion()
 	if apiVersion != "" {
 		query.Add("api-version", apiVersion)
+	}
+	for k, v := range queryParams {
+		query.Add(k, v)
 	}
 	req.URL.RawQuery = query.Encode()
 
@@ -138,7 +140,7 @@ func (client *InstanceMetadataClient) getVersions(ctx context.Context) ([]string
 	versions := struct {
 		APIVersions []string `json:"apiVersions"`
 	}{}
-	body, err := client.getRawMetadata(ctx, "/versions")
+	body, err := client.getRawMetadata(ctx, "/versions", map[string]string{"format": "json"})
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -168,7 +170,7 @@ func (client *InstanceMetadataClient) GetTags(ctx context.Context) (map[string]s
 		Name  string `json:"name"`
 		Value string `json:"value"`
 	}{}
-	body, err := client.getRawMetadata(ctx, "/instance/compute/tagsList")
+	body, err := client.getRawMetadata(ctx, "/instance/compute/tagsList", map[string]string{"format": "json"})
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -202,7 +204,7 @@ func (client *InstanceMetadataClient) GetID(ctx context.Context) (string, error)
 	compute := struct {
 		ResourceID string `json:"resourceId"`
 	}{}
-	body, err := client.getRawMetadata(ctx, "/instance/compute")
+	body, err := client.getRawMetadata(ctx, "/instance/compute", map[string]string{"format": "json"})
 	if err != nil {
 		return "", trace.Wrap(err)
 	}
@@ -215,6 +217,27 @@ func (client *InstanceMetadataClient) GetID(ctx context.Context) (string, error)
 	}
 
 	return compute.ResourceID, nil
+}
+
+// GetAttestedData gets attested data from the instance.
+func (client *InstanceMetadataClient) GetAttestedData(ctx context.Context, nonce string) ([]byte, error) {
+	body, err := client.getRawMetadata(ctx, "/attested/document", map[string]string{"nonce": nonce, "format": "json"})
+	return body, trace.Wrap(err)
+}
+
+// GetAccessToken gets an oauth2 access token from the instance.
+func (client *InstanceMetadataClient) GetAccessToken(ctx context.Context) (string, error) {
+	body, err := client.getRawMetadata(ctx, "/identity/oauth2/token", map[string]string{"resource": "https://management.azure.com/"})
+	if err != nil {
+		return "", trace.Wrap(err)
+	}
+	var tokenResponse struct {
+		AccessToken string `json:"access_token"`
+	}
+	if err := utils.FastUnmarshal(body, &tokenResponse); err != nil {
+		return "", trace.Wrap(err)
+	}
+	return tokenResponse.AccessToken, nil
 }
 
 // selectVersion selects the most recent API version greater than or equal to
