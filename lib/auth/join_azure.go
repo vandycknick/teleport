@@ -28,16 +28,17 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 	"github.com/coreos/go-oidc"
-	"github.com/gravitational/teleport/api/client"
-	"github.com/gravitational/teleport/api/client/proto"
-	"github.com/gravitational/teleport/api/types"
-	"github.com/gravitational/teleport/lib/cloud/azure"
-	"github.com/gravitational/teleport/lib/utils"
 	"github.com/gravitational/trace"
 	"github.com/jonboulle/clockwork"
 	"go.mozilla.org/pkcs7"
 	"golang.org/x/exp/slices"
 	"gopkg.in/square/go-jose.v2/jwt"
+
+	"github.com/gravitational/teleport/api/client"
+	"github.com/gravitational/teleport/api/client/proto"
+	"github.com/gravitational/teleport/api/types"
+	"github.com/gravitational/teleport/lib/cloud/azure"
+	"github.com/gravitational/teleport/lib/utils"
 )
 
 const azureAccessTokenAudience = "https://management.azure.com/"
@@ -153,7 +154,7 @@ func withVMClient(vmClient azure.VirtualMachinesClient) azureRegisterOption {
 }
 
 // parseAndVeryAttestedData verifies that an attested data document was signed
-// by Azure. If verification is successfull, it returns the ID of the VM that
+// by Azure. If verification is successful, it returns the ID of the VM that
 // produced the document.
 func parseAndVerifyAttestedData(adBytes []byte, challenge string, certs []*x509.Certificate) (string, error) {
 	var signedAD signedAttestedData
@@ -164,7 +165,7 @@ func parseAndVerifyAttestedData(adBytes []byte, challenge string, certs []*x509.
 		return "", trace.AccessDenied("unsupported signature type: %v", signedAD.Encoding)
 	}
 
-	sigPEM := fmt.Sprintf("-----BEGIN PKCS7-----\n%s\n-----END PKCS7-----", string(signedAD.Signature))
+	sigPEM := fmt.Sprintf("-----BEGIN PKCS7-----\n%s\n-----END PKCS7-----", signedAD.Signature)
 	sigBER, _ := pem.Decode([]byte(sigPEM))
 	if sigBER == nil {
 		return "", trace.AccessDenied("unable to decode attested data document")
