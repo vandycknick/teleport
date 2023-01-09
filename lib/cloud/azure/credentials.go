@@ -35,6 +35,7 @@ func NewStaticCredential(token azcore.AccessToken) *StaticCredential {
 	}
 }
 
+// GetToken gets the access token.
 func (c *StaticCredential) GetToken(ctx context.Context, options policy.TokenRequestOptions) (azcore.AccessToken, error) {
 	return c.token, nil
 }
