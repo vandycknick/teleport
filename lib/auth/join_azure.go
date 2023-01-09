@@ -20,10 +20,10 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/base64"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
@@ -32,6 +32,7 @@ import (
 	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/lib/cloud/azure"
+	"github.com/gravitational/teleport/lib/utils"
 	"github.com/gravitational/trace"
 	"github.com/jonboulle/clockwork"
 	"go.mozilla.org/pkcs7"
@@ -156,7 +157,7 @@ func withVMClient(vmClient azure.VirtualMachinesClient) azureRegisterOption {
 // produced the document.
 func parseAndVerifyAttestedData(adBytes []byte, challenge string, certs []*x509.Certificate) (string, error) {
 	var signedAD signedAttestedData
-	if err := json.Unmarshal(adBytes, &signedAD); err != nil {
+	if err := utils.FastUnmarshal(adBytes, &signedAD); err != nil {
 		return "", trace.Wrap(err)
 	}
 	if signedAD.Encoding != "pkcs7" {
@@ -185,7 +186,7 @@ func parseAndVerifyAttestedData(adBytes []byte, challenge string, certs []*x509.
 	}
 
 	var ad attestedData
-	if err := json.Unmarshal(p7.Content, &ad); err != nil {
+	if err := utils.FastUnmarshal(p7.Content, &ad); err != nil {
 		return "", trace.Wrap(err)
 	}
 
@@ -194,6 +195,57 @@ func parseAndVerifyAttestedData(adBytes []byte, challenge string, certs []*x509.
 	}
 
 	return ad.ID, nil
+}
+
+// verifyVMIdentity verifies that the provided access token came from the
+// correct Azure VM.
+func verifyVMIdentity(ctx context.Context, cfg *azureRegisterConfig, accessToken, vmID string, requestStart time.Time) (*azure.VirtualMachine, error) {
+	tokenClaims, err := cfg.verify(ctx, accessToken)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	expectedIssuer := fmt.Sprintf("https://sts.windows.net/%v/", tokenClaims.TenantID)
+	if tokenClaims.Version == "2.0" {
+		expectedIssuer += "2.0"
+	}
+
+	expectedClaims := jwt.Expected{
+		Issuer:   expectedIssuer,
+		Audience: jwt.Audience{azureAccessTokenAudience},
+		Time:     requestStart,
+	}
+
+	if err := tokenClaims.Validate(expectedClaims); err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	rsID, err := arm.ParseResourceID(tokenClaims.ResourceID)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	vmClient := cfg.vmClient
+	if vmClient == nil {
+		tokenCredential := azure.NewStaticCredential(azcore.AccessToken{
+			Token:     accessToken,
+			ExpiresOn: tokenClaims.Expiry.Time(),
+		})
+		var err error
+		vmClient, err = azure.NewVirtualMachinesClient(rsID.SubscriptionID, tokenCredential, nil)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+	}
+
+	vm, err := vmClient.Get(ctx, tokenClaims.ResourceID)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	if vm.VMID != vmID {
+		return nil, trace.AccessDenied("vm ID does not match")
+	}
+	return vm, nil
 }
 
 func checkAzureAllowRules(vm *azure.VirtualMachine, allowRules []*types.ProvisionTokenSpecV2Azure_Rule) error {
@@ -229,50 +281,9 @@ func (a *Server) checkAzureRequest(ctx context.Context, challenge string, req *p
 		return trace.Wrap(err)
 	}
 
-	tokenClaims, err := cfg.verify(ctx, req.AccessToken)
+	vm, err := verifyVMIdentity(ctx, cfg, req.AccessToken, vmID, requestStart)
 	if err != nil {
 		return trace.Wrap(err)
-	}
-
-	expectedIssuer := fmt.Sprintf("https://sts.windows.net/%v/", tokenClaims.TenantID)
-	if tokenClaims.Version == "2.0" {
-		expectedIssuer += "2.0" // TODO(atburke): need extra "/" ?
-	}
-
-	expectedClaims := jwt.Expected{
-		Issuer:   expectedIssuer,
-		Audience: jwt.Audience{azureAccessTokenAudience},
-		Time:     requestStart,
-	}
-
-	if err := tokenClaims.Validate(expectedClaims); err != nil {
-		return trace.Wrap(err)
-	}
-
-	rsID, err := arm.ParseResourceID(tokenClaims.ResourceID)
-	if err != nil {
-		return trace.Wrap(err)
-	}
-
-	vmClient := cfg.vmClient
-	if vmClient == nil {
-		tokenCredential := azure.NewStaticCredential(azcore.AccessToken{
-			Token:     req.AccessToken,
-			ExpiresOn: tokenClaims.Expiry.Time(),
-		})
-		var err error
-		vmClient, err = azure.NewVirtualMachinesClient(rsID.SubscriptionID, tokenCredential, nil)
-		if err != nil {
-			return trace.Wrap(err)
-		}
-	}
-
-	vm, err := vmClient.Get(ctx, tokenClaims.ResourceID)
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	if vm.VMID != vmID {
-		return trace.AccessDenied("vm ID does not match")
 	}
 
 	token, ok := provisionToken.(*types.ProvisionTokenV2)
