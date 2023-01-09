@@ -106,12 +106,17 @@ func (c *vmClient) Get(ctx context.Context, resourceID string) (*VirtualMachine,
 		}
 	}
 
+	var vmID string
+	if resp.Properties != nil {
+		vmID = *resp.Properties.VMID
+	}
+
 	return &VirtualMachine{
 		ID:            *resp.ID,
 		Name:          *resp.Name,
 		Subscription:  parsedResourceID.SubscriptionID,
 		ResourceGroup: parsedResourceID.ResourceGroupName,
-		VMID:          *resp.Properties.VMID,
+		VMID:          vmID,
 		Identities:    identities,
 	}, nil
 }
