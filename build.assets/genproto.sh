@@ -27,9 +27,6 @@ main() {
   buf generate --template=lib/prehog/buf.gen.yaml lib/prehog/proto
 
   cp -r github.com/gravitational/teleport/* .
-
-  # Generate prehog protos.
-  cd lib/prehog && buf generate
 }
 
 main "$@"
