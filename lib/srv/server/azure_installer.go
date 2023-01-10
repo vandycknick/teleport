@@ -5,8 +5,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v3"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/gravitational/teleport/api/client/proto"
-	"github.com/gravitational/teleport/api/types"
 	apievents "github.com/gravitational/teleport/api/types/events"
 	"github.com/gravitational/teleport/lib/auth"
 	"github.com/gravitational/teleport/lib/cloud/azure"
@@ -62,14 +60,6 @@ func (ai *AzureInstaller) Run(ctx context.Context, req AzureRunRequest) error {
 			for k, v := range req.Params {
 				params[k] = v
 			}
-			// TODO: TTL
-			token, err := ai.AccessPoint.GenerateToken(ctx, &proto.GenerateTokenRequest{
-				Roles: []types.SystemRole{types.RoleNode},
-			})
-			if err != nil {
-				return trace.Wrap(err)
-			}
-			params["token"] = token
 
 			runRequest := azure.RunCommandRequest{
 				Region:        req.Region,

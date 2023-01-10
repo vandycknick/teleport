@@ -716,8 +716,6 @@ type DiscoveryAccessPoint interface {
 	UpdateKubernetesCluster(ctx context.Context, cluster types.KubeCluster) error
 	// DeleteKubernetesCluster deletes specified kubernetes cluster resource.
 	DeleteKubernetesCluster(ctx context.Context, name string) error
-	// GenerateToken generates a new auth token for the given service roles.
-	GenerateToken(ctx context.Context, req *proto.GenerateTokenRequest) (string, error)
 }
 
 // AccessCache is a subset of the interface working on the certificate authorities
@@ -1080,11 +1078,6 @@ func (w *DiscoveryWrapper) UpdateKubernetesCluster(ctx context.Context, cluster 
 // DeleteKubernetesCluster deletes specified kubernetes cluster resource.
 func (w *DiscoveryWrapper) DeleteKubernetesCluster(ctx context.Context, name string) error {
 	return w.NoCache.DeleteKubernetesCluster(ctx, name)
-}
-
-// GenerateToken generates a new auth token for the given service roles.
-func (w *DiscoveryWrapper) GenerateToken(ctx context.Context, req *proto.GenerateTokenRequest) (string, error) {
-	return w.NoCache.GenerateToken(ctx, req)
 }
 
 // Close closes all associated resources

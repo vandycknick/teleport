@@ -37,6 +37,7 @@
   # passed as the first argument to the script
   sudo /usr/local/bin/teleport node configure \
     --proxy="{{ .PublicProxyAddr }}" \
+    --join-method=azure \
     --token="$1" \
     --output=file \
     --labels="teleport.dev/vm-id=${VM_ID},teleport.dev/account-id=${SUBSCRIPTION_ID},teleport.dev/region=${REGION},teleport.dev/resource-group=${RESOURCE_GROUP}"

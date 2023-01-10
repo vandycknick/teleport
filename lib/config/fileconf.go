@@ -543,9 +543,9 @@ func checkAndSetDefaultsForAzureMatchers(matcherInput []AzureMatcher) error {
 			}
 		} else {
 			if method := matcher.InstallParams.JoinParams.Method; method == "" {
-				matcher.InstallParams.JoinParams.Method = types.JoinMethodToken
-			} else if method != types.JoinMethodToken {
-				return trace.BadParameter("only token joining is supported for Azure auto-discovery")
+				matcher.InstallParams.JoinParams.Method = types.JoinMethodAzure
+			} else if method != types.JoinMethodAzure {
+				return trace.BadParameter("only Azure joining is supported for Azure auto-discovery")
 			}
 			if token := matcher.InstallParams.JoinParams.TokenName; token == "" {
 				matcher.InstallParams.JoinParams.TokenName = defaults.AzureInviteTokenName
