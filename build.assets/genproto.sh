@@ -30,13 +30,9 @@ main() {
   # Generate connect-go protos.
   buf generate --template=buf-connect-go.gen.yaml lib/prehog/proto
 
-  # Generate lib/teleterm & JS protos.
-  # TODO(ravicious): Refactor generating JS protos to follow the approach from above, that is have a
-  # separate call to generate Go protos and another for JS protos instead of having
-  # teleterm-specific buf.gen.yaml files.
-  # https://github.com/gravitational/teleport/pull/19774#discussion_r1061524458
-	buf generate --template=lib/prehog/buf-teleterm.gen.yaml lib/prehog/proto
-	buf generate --template=lib/teleterm/buf.gen.yaml lib/teleterm/api/proto
+  # Generate JS protos.
+	buf generate --template=buf-js.gen.yaml lib/prehog/proto
+	buf generate --template=buf-js.gen.yaml lib/teleterm/api/proto
 
   cp -r github.com/gravitational/teleport/* .
 }
