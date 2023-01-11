@@ -408,12 +408,13 @@ func (s *Server) handleAzureInstances(instances *server.AzureInstances) error {
 		instances.SubscriptionID, genAzureInstancesLogStr(instances.Instances),
 	)
 	req := server.AzureRunRequest{
-		Client:        client,
-		Instances:     instances.Instances,
-		Region:        instances.Region,
-		ResourceGroup: instances.ResourceGroup,
-		Params:        instances.Parameters,
-		ScriptName:    instances.ScriptName,
+		Client:          client,
+		Instances:       instances.Instances,
+		Region:          instances.Region,
+		ResourceGroup:   instances.ResourceGroup,
+		Params:          instances.Parameters,
+		ScriptName:      instances.ScriptName,
+		PublicProxyAddr: instances.PublicProxyAddr,
 	}
 	return trace.Wrap(s.azureInstaller.Run(s.ctx, req))
 }

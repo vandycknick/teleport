@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v3"
 	"github.com/aws/aws-sdk-go/aws"
@@ -35,12 +36,13 @@ func NewAzureInstaller(cfg AzureInstallerConfig) *AzureInstaller {
 // AzureRunRequest combines parameters for running commands on a set of Azure
 // virtual machines.
 type AzureRunRequest struct {
-	Client        azure.RunCommandClient
-	Instances     []*armcompute.VirtualMachine
-	Params        map[string]string
-	Region        string
-	ResourceGroup string
-	ScriptName    string
+	Client          azure.RunCommandClient
+	Instances       []*armcompute.VirtualMachine
+	Params          map[string]string
+	Region          string
+	ResourceGroup   string
+	ScriptName      string
+	PublicProxyAddr string
 }
 
 // Run runs a command on a set of virtual machines and then blocks until the
@@ -48,10 +50,6 @@ type AzureRunRequest struct {
 func (ai *AzureInstaller) Run(ctx context.Context, req AzureRunRequest) error {
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(10)
-	installer, err := ai.AccessPoint.GetInstaller(ctx, req.ScriptName)
-	if err != nil {
-		return trace.Wrap(err)
-	}
 
 	for _, inst := range req.Instances {
 		inst := inst
@@ -66,10 +64,14 @@ func (ai *AzureInstaller) Run(ctx context.Context, req AzureRunRequest) error {
 				ResourceGroup: req.ResourceGroup,
 				VMName:        aws.StringValue(inst.Name),
 				Parameters:    req.Params,
-				Script:        installer.GetScript(),
+				ScriptURI:     getInstallerScriptURI(req.ScriptName, req.PublicProxyAddr),
 			}
 			return trace.Wrap(req.Client.Run(ctx, runRequest))
 		})
 	}
 	return trace.Wrap(g.Wait())
+}
+
+func getInstallerScriptURI(installerName, publicProxyAddr string) string {
+	return fmt.Sprintf("https://%s/v1/webapi/installer/%v", publicProxyAddr, installerName)
 }

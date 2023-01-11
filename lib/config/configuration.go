@@ -1171,16 +1171,33 @@ func applyDiscoveryConfig(fc *FileConfig, cfg *service.Config) {
 	}
 
 	for _, matcher := range fc.Discovery.AzureMatchers {
-		cfg.Discovery.AzureMatchers = append(
-			cfg.Discovery.AzureMatchers,
-			services.AzureMatcher{
-				Subscriptions:  matcher.Subscriptions,
-				ResourceGroups: matcher.ResourceGroups,
-				Types:          matcher.Types,
-				Regions:        matcher.Regions,
-				ResourceTags:   matcher.ResourceTags,
-			},
-		)
+		m := services.AzureMatcher{
+			Subscriptions:  matcher.Subscriptions,
+			ResourceGroups: matcher.ResourceGroups,
+			Types:          matcher.Types,
+			Regions:        matcher.Regions,
+			ResourceTags:   matcher.ResourceTags,
+		}
+
+		if matcher.InstallParams != nil {
+			m.Params = services.InstallerParams{
+				JoinMethod:      matcher.InstallParams.JoinParams.Method,
+				JoinToken:       matcher.InstallParams.JoinParams.TokenName,
+				ScriptName:      matcher.InstallParams.ScriptName,
+				PublicProxyAddr: matcher.InstallParams.PublicProxyAddr,
+			}
+
+			// Make an educated guess for the proxy address if it wasn't provided.
+			if m.Params.PublicProxyAddr == "" {
+				if fc.ProxyServer != "" {
+					m.Params.PublicProxyAddr = fc.ProxyServer
+				} else if fc.Proxy.Enabled() && len(fc.Proxy.PublicAddr) > 0 {
+					m.Params.PublicProxyAddr = fc.Proxy.PublicAddr[0]
+				}
+			}
+			cfg.Discovery.AzureMatchers = append(cfg.Discovery.AzureMatchers, m)
+		}
+
 	}
 
 	for _, matcher := range fc.Discovery.GCPMatchers {

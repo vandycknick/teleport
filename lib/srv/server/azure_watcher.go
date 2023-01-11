@@ -41,6 +41,9 @@ type AzureInstances struct {
 	// ScriptName is the name of the script to execute on the instances to
 	// install Teleport.
 	ScriptName string
+	// PublicProxyAddr is the address of the proxy the discovered node should use
+	// to connect to the cluster.
+	PublicProxyAddr string
 	// Parameters are the parameters passed to the installation script.
 	Parameters map[string]string
 	// Instances is a list of discovered Azure virtual machines.
@@ -101,8 +104,9 @@ func newAzureInstanceFetcher(cfg azureFetcherConfig) *azureInstanceFetcher {
 		ResourceGroup: cfg.ResourceGroup,
 		Labels:        cfg.Matcher.ResourceTags,
 		Parameters: map[string]string{
-			"token":      cfg.Matcher.Params.JoinToken,
-			"scriptName": cfg.Matcher.Params.ScriptName,
+			"token":           cfg.Matcher.Params.JoinToken,
+			"scriptName":      cfg.Matcher.Params.ScriptName,
+			"publicProxyAddr": cfg.Matcher.Params.PublicProxyAddr,
 		},
 	}
 }
@@ -138,11 +142,12 @@ func (f *azureInstanceFetcher) GetInstances(ctx context.Context) ([]Instances, e
 	for region, vms := range instancesByRegion {
 		if len(vms) > 0 {
 			instances = append(instances, Instances{AzureInstances: &AzureInstances{
-				SubscriptionID: f.Subscription,
-				Region:         region,
-				ResourceGroup:  f.ResourceGroup,
-				Instances:      vms,
-				ScriptName:     f.Parameters["scriptName"],
+				SubscriptionID:  f.Subscription,
+				Region:          region,
+				ResourceGroup:   f.ResourceGroup,
+				Instances:       vms,
+				ScriptName:      f.Parameters["scriptName"],
+				PublicProxyAddr: f.Parameters["publicProxyAddr"],
 			}})
 		}
 	}

@@ -60,6 +60,9 @@ type InstallerParams struct {
 	// ScriptName is the name of the teleport script for the EC2
 	// instance to execute
 	ScriptName string
+	// PublicProxyAddr is the address of the proxy the discovered node should use
+	// to connect to the cluster.
+	PublicProxyAddr string
 }
 
 // AWSMatcher matches AWS databases.
@@ -134,6 +137,7 @@ func SimplifyAzureMatchers(matchers []AzureMatcher) []AzureMatcher {
 			Regions:        regions,
 			Types:          ts,
 			ResourceTags:   m.ResourceTags,
+			Params:         m.Params,
 		})
 	}
 	return result

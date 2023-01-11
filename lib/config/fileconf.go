@@ -533,26 +533,28 @@ func checkAndSetDefaultsForAzureMatchers(matcherInput []AzureMatcher) error {
 			}
 		}
 
-		if matcher.InstallParams == nil {
-			matcher.InstallParams = &InstallParams{
-				JoinParams: JoinParams{
-					TokenName: defaults.AzureInviteTokenName,
-					Method:    types.JoinMethodToken,
-				},
-				ScriptName: installers.AzureInstallerScriptName,
-			}
-		} else {
-			if method := matcher.InstallParams.JoinParams.Method; method == "" {
-				matcher.InstallParams.JoinParams.Method = types.JoinMethodAzure
-			} else if method != types.JoinMethodAzure {
-				return trace.BadParameter("only Azure joining is supported for Azure auto-discovery")
-			}
-			if token := matcher.InstallParams.JoinParams.TokenName; token == "" {
-				matcher.InstallParams.JoinParams.TokenName = defaults.AzureInviteTokenName
-			}
+		if slices.Contains(matcher.Types, constants.AzureServiceTypeVM) {
+			if matcher.InstallParams == nil {
+				matcher.InstallParams = &InstallParams{
+					JoinParams: JoinParams{
+						TokenName: defaults.AzureInviteTokenName,
+						Method:    types.JoinMethodAzure,
+					},
+					ScriptName: installers.AzureInstallerScriptName,
+				}
+			} else {
+				if method := matcher.InstallParams.JoinParams.Method; method == "" {
+					matcher.InstallParams.JoinParams.Method = types.JoinMethodAzure
+				} else if method != types.JoinMethodAzure {
+					return trace.BadParameter("only Azure joining is supported for Azure auto-discovery")
+				}
+				if token := matcher.InstallParams.JoinParams.TokenName; token == "" {
+					matcher.InstallParams.JoinParams.TokenName = defaults.AzureInviteTokenName
+				}
 
-			if installer := matcher.InstallParams.ScriptName; installer == "" {
-				matcher.InstallParams.ScriptName = installers.AzureInstallerScriptName
+				if installer := matcher.InstallParams.ScriptName; installer == "" {
+					matcher.InstallParams.ScriptName = installers.AzureInstallerScriptName
+				}
 			}
 		}
 
@@ -1501,6 +1503,9 @@ type InstallParams struct {
 	// ScriptName is the name of the teleport installer script
 	// resource for the cloud instance to execute
 	ScriptName string `yaml:"script_name,omitempty"`
+	// PublicProxyAddr is the address of the proxy the discovered node should use
+	// to connect to the cluster.
+	PublicProxyAddr string `yaml:"public_proxy_addr,omitempty"`
 }
 
 // AWSSSM provides options to use when executing SSM documents
