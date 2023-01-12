@@ -13,7 +13,7 @@ version of the Helm charts.
 
 <Admonition type="warning">
 Those instructions are both for v12 Teleport and v12 `teleport-cluster` chart.
-If you are running an older Teleport version, use the version selector to consult
+If you are running an older Teleport version, use the version selector to choose
 the correct version.
 </Admonition>
 
@@ -34,14 +34,14 @@ the correct version.
 In `scratch` mode, the `teleport-cluster` Helm chart generates a minimal
 configuration and lets you pass your custom configuration through the chart's values.
 
-`teleport-cluster` deploys two sets of nodes: proxy and auth.
-You must provide two configurations, one for each node type.
+`teleport-cluster` deploys two sets of pods: proxy and auth.
+You must provide two configurations, one for each pod type.
 
-- The `proxy` node configuration should contain at least the `proxy_service` section and the `teleport` section without the `storage` part.
-- The `auth` node configuration should contain at least the `auth_service` section and the `teleport` one.
+- The `proxy` pod configuration should contain at least the `proxy_service` section and the `teleport` section without the `storage` part.
+- The `auth` pod configuration should contain at least the `auth_service` section and the `teleport` one.
 
-For the proxy nodes to connect to the auth nodes you must provide a token in their configuration.
-The chart creates a Kubernetes join token named after the release name you can use for a seamless join.
+The chart automatically creates a Kubernetes join token named after the Helm release which will enable the proxy pods to seamlessly connect to the auth pods.
+If you do not want to use this automatic token, you must provide a valid Teleport join token in the proxy pods' configuration.
 
 <Admonition type="warning">
   When using `scratch` or `standalone` mode, you **must** use highly-available storage (e.g. etcd, DynamoDB, or Firestore) for multiple replicas to be supported.
@@ -67,7 +67,6 @@ auth:
 
     auth_service:
       enabled: true
-      cluster_name: custom.example.com
       listen_addr: 0.0.0.0:3025
 
 proxy:
@@ -75,7 +74,7 @@ proxy:
     # put your teleport.yaml proxy configuration here
     teleport:
       # The join_params section must be provided for the proxies to join the auth servers
-      # The chart creates by default a Kubernetes join token you can use.
+      # By default, the chart creates a Kubernetes join token which you can use.
       join_params:
         method: kubernetes
         token_name: "RELEASE-NAME-proxy"  # replace RELEASE-NAME

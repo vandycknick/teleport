@@ -10,7 +10,7 @@ See the [Teleport HA Architecture page](../../deploy-a-cluster/high-availability
 You can
 [browse the source on GitHub](https://github.com/gravitational/teleport/tree/branch/v(=teleport.major_version=)/examples/chart/teleport-cluster).
 
-The `teleport-cluster` chart runs three Teleport services split in two sets of pods:
+The `teleport-cluster` chart runs three Teleport services, split into two sets of pods:
 
 | Teleport service | Running in | Purpose | Documentation |
 | - | - | - | - |
@@ -34,16 +34,16 @@ The `teleport-cluster` chart can be deployed in four different modes. Get starte
 | `standalone` | Runs by relying only on Kubernetes resources. | [Getting Started - Kubernetes with SSO](../../deploy-a-cluster/helm-deployments/kubernetes-cluster.mdx) |
 | `aws` | Leverages AWS managed services to store data. | [Running an HA Teleport cluster using an AWS EKS Cluster](../../deploy-a-cluster/helm-deployments/aws.mdx) |
 | `gcp` | Leverages GCP managed services to store data. | [Running an HA Teleport cluster using a Google Cloud GKE cluster](../../deploy-a-cluster/helm-deployments/gcp.mdx) |
-| `scratch` (v12 and above) | Generates empty Teleport configuration. User must pass its own config.  | [Running a Teleport cluster with a custom config](../../deploy-a-cluster/helm-deployments/custom.mdx) |
+| `scratch` (v12 and above) | Generates empty Teleport configuration. User must pass their own config. | [Running a Teleport cluster with a custom config](../../deploy-a-cluster/helm-deployments/custom.mdx) |
 
 <Admonition type="note" title="Custom mode removal">
-`custom` mode has been removed with Teleport version 12. See the [version 12 migration guide]().
+`custom` mode has been removed in Teleport version 12. See the [version 12 migration guide]().
 </Admonition>
 
 <Admonition type="warning" title="Version Compatibility">
 The chart is versioned with Teleport. No compatibility guarantees are ensured
 between new charts and previous major Teleport versions. It is strongly recommended
-to always run to deploy a Teleport version higher or equal than the chart version.
+to always deploy a Teleport version with the same major version as the Helm chart.
 </Admonition>
 
 This reference details available values for the `teleport-cluster` chart.
@@ -58,7 +58,7 @@ This reference details available values for the `teleport-cluster` chart.
 
 `clusterName` controls the name used to refer to the Teleport cluster, along with
 the externally-facing public address to use to access it. In most setups this must
-be a fully-qualified domain name (e.g. `teleport.example.com`) as this values is
+be a fully-qualified domain name (e.g. `teleport.example.com`) as this value is
 used as the cluster's public address by default.
 
 <Admonition type="note">
@@ -77,7 +77,7 @@ used as the cluster's public address by default.
 </Admonition>
 
 <Admonition type="warning">
-  The clusterName must not change in the Teleport cluster lifespan.
+  The `clusterName` cannot be changed during a Teleport cluster's lifespan. If you need to change it, you must redeploy a completely new cluster.
 </Admonition>
 
 ## `kubeClusterName`
@@ -94,7 +94,7 @@ This name will be shown to Teleport users connecting to the Kubernetes cluster.
 | - | - | - |
 | `object` | {} | no |
 
-The `teleport-cluster` charts deploys two sets of pods: auth and proxy.
+The `teleport-cluster` chart deploys two sets of pods: auth and proxy.
 `auth` contains values specific for the auth pods. You can use it to
 set specific values for auth pods, taking precedence over chart-scoped values.
 
@@ -129,7 +129,7 @@ auth:
         enabled: false
     auth_service:
       client_idle_timeout: 2h
-      client_idle_timeout_message: "Connection closed after 2hours without activity"
+      client_idle_timeout_message: "Connection closed after 2 hours without activity"
 ```
 
 ## `proxy`
@@ -138,10 +138,10 @@ auth:
 | `object` | {} | no |
 
 The `teleport-cluster` charts deploys two sets of pods: auth and proxy.
-`proxy` contains values specific for the auth pods. You can use it to
+`proxy` contains values specific to the proxy pods. You can use it to
 set specific values for proxy pods, taking precedence over chart-scoped values.
 
-For example, to override the [`postStart`](#postStart) value only for auth pods:
+For example, to override the [`postStart`](#postStart) value only for proxy pods:
 ```yaml
 # By default all pods postStart command should be "echo starting"
 postStart: ["echo", "starting"]
@@ -985,8 +985,7 @@ Controls the amount of pod replicas. The [`highAvailability`](#highAvailability)
 the replication requirements.
 
 <Admonition type="warning" title="Version Compatibility">
-  If you set a value greater than 1, you **must** meet the replication criteria.
-  Else, the deployment will result in errors and inconsistent data.
+  If you set a value greater than 1, you **must** meet the replication criteria described above. Failure to do so will result in errors and inconsistent data.
 </Admonition>
 
 ## `highAvailability.requireAntiAffinity`

@@ -4,14 +4,15 @@
 
 # `clusterName` controls the name used to refer to the Teleport cluster, along with
 # the externally-facing public address to use to access it. In most setups this must
-# be a fully-qualified domain name (e.g. `teleport.example.com`) as this values is
+# be a fully-qualified domain name (e.g. `teleport.example.com`) as this value is
 # used as the cluster's public address by default.
 #
 # Note: When using a fully qualified domain name as your `clusterName`, you will also
 # need to configure the DNS provider for this domain to point to the external
 # load balancer address of your Teleport cluster.
 #
-# Warning: The clusterName must not change in the Teleport cluster lifespan.
+# Warning: The clusterName cannot be changed during a Teleport cluster's lifespan.
+# If you need to change it, you must redeploy a completely new cluster.
 clusterName: ""
 
 # Name for this kubernetes cluster to be used by teleport users.
