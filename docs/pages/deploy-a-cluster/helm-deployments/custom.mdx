@@ -122,7 +122,6 @@ You can then deploy Teleport in your cluster with the command:
 ```code
 $ helm install teleport teleport/teleport-cluster \
   --namespace teleport \
-  --set chartMode=custom \
   --values my-values.yaml
 ```
 
@@ -132,7 +131,6 @@ $ helm install teleport teleport/teleport-cluster \
 ```code
 $ helm install teleport teleport/teleport-cluster \
   --namespace teleport \
-  --set chartMode=custom \
   --set enterprise=true \
   --values my-values.yaml
 ```
