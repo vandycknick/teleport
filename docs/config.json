@@ -796,6 +796,10 @@
               "slug": "/database-access/guides/postgres-redshift/"
             },
             {
+              "title": "AWS Redshift Serverless",
+              "slug": "/database-access/guides/redshift-serverless/"
+            },
+            {
               "title": "AWS ElastiCache & MemoryDB",
               "slug": "/database-access/guides/redis-aws/"
             },
