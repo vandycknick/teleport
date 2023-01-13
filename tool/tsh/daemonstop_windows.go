@@ -10,30 +10,23 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func onDaemonStop(cf *CLIConf) error {
-	k32, err := syscall.LoadDLL("kernel32.dll")
-	if err != nil {
-		return trace.Wrap(err)
-	}
+var (
+	k32                   = syscall.NewLazyDLL("kernel32.dll")
+	freeConsole           = k32.NewProc("FreeConsole")
+	attachConsole         = k32.NewProc("AttachConsole")
+)
 
-	freeConsole, err := k32.FindProc("FreeConsole")
-	if err != nil {
-		return trace.Wrap(err)
-	}
+func onDaemonStop(cf *CLIConf) error {
 	retVal, _, err := freeConsole.Call()
 	if retVal == 0 {
 		return trace.Wrap(err)
 	}
 
-	attachConsole, err := k32.FindProc("AttachConsole")
-	if err != nil {
-		return trace.Wrap(err)
-	}
 	retVal, _, err = attachConsole.Call(uintptr(cf.DaemonPid))
 	if retVal == 0 {
 		return trace.Wrap(err)
 	}
 
-	err = windows.GenerateConsoleCtrlEvent(windows.CTRL_C_EVENT, 0)
+	err = windows.GenerateConsoleCtrlEvent(windows.CTRL_BREAK_EVENT, 0)
 	return trace.Wrap(err)
 }
