@@ -112,7 +112,7 @@ type KubePod struct {
 	// Namespace is the Kubernetes namespace where the Pod is located.
 	Namespace string `json:"namespace"`
 	// KubeCluster is the Kubernetes cluster the pod blongs to.
-	KubeCluster string
+	KubeCluster string `json:"cluster"`
 }
 
 // MakeKubeClusters creates ui kube objects and returns a list.
