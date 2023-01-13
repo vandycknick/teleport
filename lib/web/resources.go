@@ -50,7 +50,6 @@ func (h *Handler) checkAccessToRegisteredResource(w http.ResponseWriter, r *http
 			ResourceType: kind,
 			Limit:        1,
 		})
-
 		if err != nil {
 			// Access denied error is returned when user does not have permissions
 			// to read/list a resource kind which can be ignored as this function is not
@@ -349,8 +348,11 @@ func listResources(clt resourcesAPIGetter, r *http.Request, resourceKind string)
 		PredicateExpression: values.Get("query"),
 		SearchKeywords:      client.ParseSearchKeywords(values.Get("search"), ' '),
 		UseSearchAsRoles:    values.Get("searchAsRoles") == "yes",
+		KubernetesPodsFilter: types.KubernetesPodsFilter{
+			Cluster:   values.Get("kubeCluster"),
+			Namespace: values.Get("kubeNamespace"),
+		},
 	}
-
 	return clt.ListResources(r.Context(), req)
 }
 

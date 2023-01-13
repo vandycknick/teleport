@@ -103,6 +103,18 @@ type KubeCluster struct {
 	KubeGroups []string `json:"kubernetes_groups"`
 }
 
+// KubePod describes a Kubernetes pod.
+type KubePod struct {
+	// Name is the name of the Kubernetes pod.
+	Name string `json:"name"`
+	// Labels is a map of static and dynamic labels associated with a Kubernetes pod.
+	Labels []Label `json:"labels"`
+	// Namespace is the Kubernetes namespace where the Pod is located.
+	Namespace string `json:"namespace"`
+	// KubeCluster is the Kubernetes cluster the pod blongs to.
+	KubeCluster string
+}
+
 // MakeKubeClusters creates ui kube objects and returns a list.
 func MakeKubeClusters(clusters []types.KubeCluster, userRoles services.RoleSet) []KubeCluster {
 	uiKubeClusters := make([]KubeCluster, 0, len(clusters))
@@ -122,6 +134,23 @@ func MakeKubeClusters(clusters []types.KubeCluster, userRoles services.RoleSet) 
 	}
 
 	return uiKubeClusters
+}
+
+// MakeKubePods creates ui kube pod objects and returns a list.
+func MakeKubePods(pods []*types.KubernetesPodV1, cluster string) []KubePod {
+	uiKubePods := make([]KubePod, 0, len(pods))
+	for _, pod := range pods {
+		staticLabels := pod.GetStaticLabels()
+		uiLabels := makeLabels(staticLabels)
+
+		uiKubePods = append(uiKubePods, KubePod{
+			Name:        pod.GetName(),
+			Labels:      uiLabels,
+			Namespace:   pod.Spec.Namespace,
+			KubeCluster: cluster,
+		})
+	}
+	return uiKubePods
 }
 
 // getAllowedKubeUsersAndGroupsForCluster works on a given set of roles to return
