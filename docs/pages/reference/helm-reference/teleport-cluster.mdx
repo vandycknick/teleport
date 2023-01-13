@@ -4,7 +4,7 @@ description: Values that can be set using the teleport-cluster Helm chart
 ---
 
 The `teleport-cluster` Helm chart deploys a Teleport cluster on Kubernetes.
-This includes deploying proxies, auth servers, kubernetes-access.
+This includes deploying proxies, auth servers, and kubernetes-access.
 See the [Teleport HA Architecture page](../../deploy-a-cluster/high-availability.mdx) for more details.
 
 You can
@@ -15,8 +15,8 @@ The `teleport-cluster` chart runs three Teleport services, split into two sets o
 | Teleport service | Running in | Purpose | Documentation |
 | - | - | - | - |
 | `auth_service` | auth `StatefulSet` | Authenticates users and hosts, and issues certificates. | [Auth documentation](../../architecture/authentication.mdx)
-| `kubernetes_service` | auth `StatefulSet` | Provides secure access to the Kubernetes cluster where the Teleport cluster is hosted. | [Kubernetes Access documentation](../../kubernetes-access/introduction.mdx) |
-| `proxy_service` | proxy `Deployment` | Runs the externally-facing parts of a Teleport cluster, such as the web UI, SSH proxy and reverse tunnel service. | [Proxy documentation](../../architecture/proxy.mdx) |
+| `kubernetes_service` | auth `StatefulSet` | Provides secure access to the Kubernetes<br/>cluster where the Teleport cluster is hosted. | [Kubernetes Access documentation](../../kubernetes-access/introduction.mdx) |
+| `proxy_service` | proxy `Deployment` | Runs the externally-facing parts of a Teleport<br/>cluster, such as the web UI, SSH proxy and reverse tunnel service. | [Proxy documentation](../../architecture/proxy.mdx) |
 
 <Admonition type="tip" title="Additional Kubernetes Clusters and Teleport Services">
 If you want to provide access to resources like Databases, Applications or other
@@ -27,7 +27,8 @@ Kubernetes clusters than the one hosting the Teleport cluster, you should use th
 - `teleport-kube-agent` connects to an existing Teleport cluster and exposes configured resources.
 </Admonition>
 
-The `teleport-cluster` chart can be deployed in four different modes. Get started with a guide for each mode:
+The `teleport-cluster` chart can be deployed in four different modes.
+Get started with a guide for each mode:
 
 | `chartMode` | Purpose | Guide |
 | - | - | - |
@@ -37,7 +38,9 @@ The `teleport-cluster` chart can be deployed in four different modes. Get starte
 | `scratch` (v12 and above) | Generates empty Teleport configuration. User must pass their own config. | [Running a Teleport cluster with a custom config](../../deploy-a-cluster/helm-deployments/custom.mdx) |
 
 <Admonition type="note" title="Custom mode removal">
-`custom` mode has been removed in Teleport version 12. See the [version 12 migration guide](../../deploy-a-cluster/helm-deployments/migration-v12.mdx).
+`custom` mode has been removed in Teleport version 12. See the [version 12
+migration guide](../../deploy-a-cluster/helm-deployments/migration-v12.mdx) for
+more information.
 </Admonition>
 
 <Admonition type="warning" title="Version Compatibility">
@@ -52,32 +55,33 @@ This reference details available values for the `teleport-cluster` chart.
 
 ## `clusterName`
 
-| Type | Default value | Required? | `teleport.yaml` equivalent |
-| - | - | - | - |
-| `string` | `nil` | Yes | `auth_service.cluster_name`, `proxy_service.public_addr` |
+| Type     | Default value | Required? | `teleport.yaml` equivalent                               |
+|----------|---------------|-----------|----------------------------------------------------------|
+| `string` | `nil`         | Yes       | `auth_service.cluster_name`, `proxy_service.public_addr` |
 
 `clusterName` controls the name used to refer to the Teleport cluster, along with
-the externally-facing public address to use to access it. In most setups this must
+the externally-facing public address used to access it. In most setups this must
 be a fully-qualified domain name (e.g. `teleport.example.com`) as this value is
 used as the cluster's public address by default.
 
 <Admonition type="note">
-  When using a fully qualified domain name as your `clusterName`, you will also
-  need to configure the DNS provider for this domain to point to the external
-  load balancer address of your Teleport cluster.
+When using a fully qualified domain name as your `clusterName`, you will also
+need to configure the DNS provider for this domain to point to the external
+load balancer address of your Teleport cluster.
 
   (!docs/pages/kubernetes-access/helm/includes/kubernetes-externaladdress.mdx!)
 
-  You will need to manually add a DNS A record pointing `teleport.example.com` to
-  either the IP or hostname of the Kubernetes load balancer.
+You will need to manually add a DNS A record pointing `teleport.example.com` to
+the IP, or a CNAME record pointing to the hostname of the Kubernetes load balancer.
 
-  <Details title="Using Application Access?">
-    (!docs/pages/includes/dns-app-access.mdx!)
-  </Details>
+<Details title="Using Application Access?">
+(!docs/pages/includes/dns-app-access.mdx!)
+</Details>
 </Admonition>
 
 <Admonition type="warning">
-  The `clusterName` cannot be changed during a Teleport cluster's lifespan. If you need to change it, you must redeploy a completely new cluster.
+The `clusterName` cannot be changed during a Teleport cluster's lifespan.
+If you need to change it, you must redeploy a completely new cluster.
 </Admonition>
 
 ## `kubeClusterName`
@@ -90,9 +94,9 @@ used as the cluster's public address by default.
 This name will be shown to Teleport users connecting to the Kubernetes cluster.
 
 ## `auth`
-| Type | Default value | Required? |
-| - | - | - |
-| `object` | {} | no |
+| Type     | Default value | Required? |
+|----------|---------------|-----------|
+| `object` | {}            | no        |
 
 The `teleport-cluster` chart deploys two sets of pods: auth and proxy.
 `auth` contains values specific for the auth pods. You can use it to
@@ -111,11 +115,11 @@ auth:
 
 ### `auth.teleportConfig`
 
-| Type | Default value | Required? |
-| - | - | - |
-| `object` | {} | no |
+| Type     | Default value | Required? |
+|----------|---------------|-----------|
+| `object` | {}            | no        |
 
-`auth.teleportConfig` contains YAML teleport configuration for auth pods
+`auth.teleportConfig` contains YAML teleport configuration for auth pods.
 The configuration will be merged with the chart-generated configuration
 and will take precedence in case of conflict.
 
@@ -133,9 +137,9 @@ auth:
 ```
 
 ## `proxy`
-| Type | Default value | Required? |
-| - | - | - |
-| `object` | {} | no |
+| Type     | Default value | Required? |
+|----------|---------------|-----------|
+| `object` | {}            | no        |
 
 The `teleport-cluster` charts deploys two sets of pods: auth and proxy.
 `proxy` contains values specific to the proxy pods. You can use it to
@@ -154,9 +158,9 @@ proxy:
 
 ### `proxy.teleportConfig`
 
-| Type | Default value | Required? |
-| - | - | - |
-| `object` | {} | no |
+| Type     | Default value | Required? |
+|----------|---------------|-----------|
+| `object` | {}            | no        |
 
 `proxy.teleportConfig` contains YAML teleport configuration for proxy pods
 The configuration will be merged with the chart-generated configuration
@@ -180,17 +184,17 @@ proxy:
 
 ### `authentication.type`
 
-| Type | Default value | Required? | `teleport.yaml` equivalent |
-| - | - | - | - |
-| `string` | `local` | Yes | `auth_service.authentication.type` |
+| Type     | Default value | Required? | `teleport.yaml` equivalent         |
+|----------|---------------|-----------|------------------------------------|
+| `string` | `local`       | Yes       | `auth_service.authentication.type` |
 
 `authentication.type` controls the authentication scheme used by Teleport. Possible values are `local` and `github` for OSS, plus `oidc` and `saml` for Enterprise.
 
 ### `authentication.connectorName`
 
-| Type | Default value | Required? | `teleport.yaml` equivalent |
-| - | - | - | - |
-| `string` | `""` | No | `auth_service.authentication.connector_name` |
+| Type     | Default value | Required? | `teleport.yaml` equivalent                   |
+|----------|---------------|-----------|----------------------------------------------|
+| `string` | `""`          | No        | `auth_service.authentication.connector_name` |
 
 `authentication.connectorName` sets the default authentication connector.
 [The SSO documentation](../../access-controls/sso.mdx) explains how to create authentication connectors for common identity
@@ -204,9 +208,9 @@ Defaults to `local`.
 
 ### `authentication.localAuth`
 
-| Type | Default value | Required? | `teleport.yaml` equivalent |
-| - | - | - | - |
-| `bool` | `true` | No | `auth_service.authentication.local_auth` |
+| Type   | Default value | Required? | `teleport.yaml` equivalent               |
+|--------|---------------|-----------|------------------------------------------|
+| `bool` | `true`        | No        | `auth_service.authentication.local_auth` |
 
 `authentication.localAuth` controls whether local authentication is enabled.
 When disabled, users can only log in through authentication connectors like `saml`, `oidc` or `github`.
@@ -215,9 +219,9 @@ When disabled, users can only log in through authentication connectors like `sam
 
 ### `authentication.lockingMode`
 
-| Type | Default value | Required? | `teleport.yaml` equivalent |
-| - | - | - | - |
-| `string` | `""` | No | `auth_service.authentication.locking_mode` |
+| Type     | Default value | Required? | `teleport.yaml` equivalent                 |
+|----------|---------------|-----------|--------------------------------------------|
+| `string` | `""`          | No        | `auth_service.authentication.locking_mode` |
 
 `authentication.lockingMode` controls the locking mode cluster-wide. Possible values are `best_effort` and `strict`.
 See [the locking modes documentation](../../access-controls/guides/locking.mdx#next-steps-locking-modes) for more
@@ -958,19 +962,19 @@ replicated and scheduled. This allows to run Teleport in a highly-available
 fashion: Teleport should sustain the crash/loss of a machine without interrupting
 the service.
 
-**For auth pods**:
+#### For auth pods
 
 When using "standalone" or "scratch" mode, you must use highly-available storage
 (etcd, DynamoDB or Firestore) for multiple replicas to be supported.
 Manually configuring NFS-based storage or ReadWriteMany volume claims
 is NOT supported and will result in errors. Using Teleport's built-in
-ACME client (opposed to using cert-manager or passing certs through a secret)
+ACME client (as opposed to using cert-manager or passing certs through a secret)
 is not supported with multiple replicas.
 
-**For proxy pods**:
+#### For proxy pods
 
-Proxy pods need to be provided a certificate to be replicated (either via
-tls.existingSecretName` or via `highAvailability.certManager`).
+Proxy pods need to be provided a certificate to be replicated (via either
+`tls.existingSecretName` or `highAvailability.certManager`).
 If proxy pods are replicable, they will default to 2 replicas,
 even if `highAvailability.replicaCount` is 1. To force a single proxy replica,
 set `proxy.highAvailability.replicaCount: 1`.

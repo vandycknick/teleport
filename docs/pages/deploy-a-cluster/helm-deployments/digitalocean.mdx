@@ -118,9 +118,9 @@ First, get the external IP (from the `EXTERNAL-IP` field) for the Kubernetes clu
 
 $ kubectl --namespace=teleport-cluster get services
 
-# NAME                    TYPE           CLUSTER-IP      EXTERNAL-IP       PORT(S)          AGE
-# teleport-cluster        LoadBalancer   10.245.163.12   192.168.200.200   443:31959/TCP,3023:30525/TCP,3026:30079/TCP,3024:32437/TCP   19m
-# teleport-cluster-auth   ClusterIP      10.245.164.28   <none>            3025/TCP,3026/TCP                                            19m
+NAME                    TYPE           CLUSTER-IP      EXTERNAL-IP       PORT(S)          AGE
+teleport-cluster        LoadBalancer   10.245.163.12   192.168.200.200   443:31959/TCP,3023:30525/TCP,3026:30079/TCP,3024:32437/TCP   19m
+teleport-cluster-auth   ClusterIP      10.245.164.28   <none>            3025/TCP,3026/TCP                                            19m
 
 
 ```

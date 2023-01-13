@@ -332,7 +332,7 @@ gcp:
 #   (etcd, DynamoDB or Firestore) for multiple replicas to be supported.
 #   Manually configuring NFS-based storage or ReadWriteMany volume claims
 #   is NOT supported and will result in errors. Using Teleport's built-in
-#   ACME client (opposed to using cert-manager or passing certs through a secret)
+#   ACME client (as opposed to using cert-manager or passing certs through a secret)
 #   is not supported with multiple replicas.
 # For proxy pods:
 #   Proxy pods need to be provided a certificate to be replicated (either via

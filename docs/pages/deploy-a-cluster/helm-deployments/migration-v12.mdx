@@ -15,11 +15,11 @@ The main changes in version 12 of the `teleport-cluster` chart are:
 - Proxies are now deployed as stateless workload. The `proxy` session recording mode uploads recordings asynchronously.
   Non-uploaded records might be lost during rollouts (config changes or version upgrades for example).
   `proxy-sync` ensures consistency and does not have this limitation.
-- `custom` mode have been removed as it was broken by the topology change.
-  It is replaced by a new configuration override mechanism allowing you to pass arbitrary Teleport configuration.
-- the values `standalone.*` that were previously deprecated in favor of `persistence` have been removed.
+- `custom` mode has been removed as it was broken by the topology change.
+  It is replaced by a new configuration override mechanism allowing you to pass arbitrary Teleport configuration values.
+- The values `standalone.*` that were previously deprecated in favor of `persistence` have been removed.
 - The chart can now be scaled up in `standalone` mode. Proxy replication requires
-  a TLS certificate; Auth replication require using [HA storage backends](../../reference/backends.mdx).
+  a TLS certificate; Auth replication requires using [HA storage backends](../../reference/backends.mdx).
 - The chart has always been versioned with Teleport but was often compatible with the previous Teleport major version.
   This is not the case for v12. Using the chart v12 requires at least Teleport v12.
 
@@ -30,13 +30,13 @@ it should be relatively straightforward. If you relied on the `custom` chart mod
 configuration changes.
 
 Before upgrading, always:
-- [backup the cluster content](../../management/operations/backup-restore.mdx)
-- test the upgrade in a non-production environment
+- [backup the cluster content](../../management/operations/backup-restore.mdx),
+- test the upgrade in a non-production environment.
 
 <Admonition type="warning">
-  During the upgrade, Kubernetes will delete existing deployments and create new ones.
-  **This is not seamless and will cause some downtime** until the new pods are up and all health checks are passing.
-  This usually takes around 5 minutes.
+During the upgrade, Kubernetes will delete existing deployments and create new ones.
+**This is not seamless and will cause some downtime** until the new pods are up and all health checks are passing.
+This usually takes around 5 minutes.
 </Admonition>
 
 ### If you use `gcp`, `aws` or `standalone` mode
@@ -53,8 +53,8 @@ to run the additional Teleport pods:
 - `aws` and `gcp` will deploy twice the amount of pods
 - `standalone` will deploy 2 to 3 pods (depending if the proxy can be replicated)
 
-The additional pods might take more time than before to deploy and become ready,
-if you are running helm with `--wait` or `--atomic` make sure to increase your
+The additional pods might take more time than before to deploy and become ready.
+If you are running helm with `--wait` or `--atomic` make sure to increase your
 timeouts to at least 10 minutes.
 
 ### If you use `custom` mode
@@ -88,8 +88,8 @@ auth_service:
   enabled: true
   cluster_name: custom.example.com
   tokens:                                        # This is custom configuration
-  - "proxy,node:my-secret-token"
-  - "trusted_cluster:my-other-secret-token"
+  - "proxy,node:(=presets.tokens.first=)"
+  - "trusted_cluster:(=presets.tokens.second=)"
   listen_addr: 0.0.0.0:3025
   public_addr: custom.example.com:3025
 proxy_service:
@@ -109,8 +109,8 @@ auth:
   teleportConfig:
     auth_service:
       tokens:
-        - "proxy,node:my-secret-token"
-        - "trusted_cluster:my-other-secret-token"
+        - "proxy,node:(=presets.tokens.first=)"
+        - "trusted_cluster:(=presets.tokens.second=)"
 
 proxy:
   teleportConfig:
@@ -119,7 +119,7 @@ proxy:
 ```
 
 <Admonition type="warning">
-  `teleport.cluster_name` and `teleport.auth_service.authentication.webauthn.rp_id` MUST NOT change.
+`teleport.cluster_name` and `teleport.auth_service.authentication.webauthn.rp_id` MUST NOT change.
 </Admonition>
 
 #### If you deploy a Teleport cluster and need to manage its full configuration
@@ -130,10 +130,12 @@ through the `auth.teleportConfig` and `proxy.teleportConfig` values.
 
 You must split the configuration in two configurations, one for each node type:
 - The `proxy` configuration must contain at least the `proxy_service` section and the `teleport` section without the `storage` part.
-- The `auth` configuration must contain at least the `auth_service` section and the `teleport` section.
+- The `auth` configuration must contain at least the `auth_service` and `teleport` sections.
 
-The chart automatically creates a Kubernetes join token named after the Helm release which will enable the proxy pods to seamlessly connect to the auth pods.
-If you do not want to use this automatic token, you must provide a valid Teleport join token in the proxy pods' configuration.
+The chart automatically creates a Kubernetes join token named after the Helm release,
+which will enable the proxy pods to seamlessly connect to the auth pods.
+If you do not want to use this automatic token, you must provide a valid Teleport
+join token in the proxy pods' configuration.
 
 For example - a v11 custom configuration that looked like this:
 
@@ -147,8 +149,8 @@ auth_service:
   enabled: true
   cluster_name: custom.example.com
   tokens:
-  - "proxy,node:my-secret-token"
-  - "trusted_cluster:my-other-secret-token"
+  - "proxy,node:(=presets.tokens.first=)"
+  - "trusted_cluster:(=presets.tokens.second=)"
   listen_addr: 0.0.0.0:3025
   public_addr: custom.example.com:3025
 proxy_service:
@@ -197,8 +199,8 @@ auth:
       enabled: true
       cluster_name: custom.example.com
       tokens:
-      - "proxy,node:my-secret-token"
-      - "trusted_cluster:my-other-secret-token"
+      - "proxy,node:(=presets.tokens.first=)"
+      - "trusted_cluster:(=presets.tokens.second=)"
       listen_addr: 0.0.0.0:3025
       public_addr: custom.example.com:3025
 ```
@@ -221,12 +223,12 @@ proxyAddr: teleport.example.com
 # in a Kubernetes Secret instead of a ConfigMap
 joinParams:
   method: token
-  tokenName: PUT-YOUR-JOIN-TOKEN-HERE
+  tokenName: (=presets.tokens.first=)
 
 # Roles can be empty if you pass all the configuration through `teleportConfig`
 roles: ""
 
-# Put all your previous `teleport.yaml` except the `teleport` section
+# Put all your previous `teleport.yaml` values except the `teleport` section below
 teleportConfig:
   # kubernetes_service:
   #   enabled: true
@@ -284,3 +286,4 @@ auth:
   highAvailability:
     requireAntiAffinity: true
 ```
+
