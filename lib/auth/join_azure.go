@@ -43,6 +43,9 @@ import (
 
 const azureAccessTokenAudience = "https://management.azure.com/"
 
+// Structs for unmarshaling attested data. Schema can be found at
+// https://learn.microsoft.com/en-us/azure/virtual-machines/linux/instance-metadata-service?tabs=linux#response-2
+
 type signedAttestedData struct {
 	Encoding  string `json:"encoding"`
 	Signature string `json:"signature"`
@@ -165,7 +168,7 @@ func parseAndVerifyAttestedData(adBytes []byte, challenge string, certs []*x509.
 		return "", trace.AccessDenied("unsupported signature type: %v", signedAD.Encoding)
 	}
 
-	sigPEM := fmt.Sprintf("-----BEGIN PKCS7-----\n%s\n-----END PKCS7-----", signedAD.Signature)
+	sigPEM := "-----BEGIN PKCS7-----\n" + signedAD.Signature + "\n-----END PKCS7-----"
 	sigBER, _ := pem.Decode([]byte(sigPEM))
 	if sigBER == nil {
 		return "", trace.AccessDenied("unable to decode attested data document")
@@ -207,6 +210,7 @@ func verifyVMIdentity(ctx context.Context, cfg *azureRegisterConfig, accessToken
 	}
 
 	expectedIssuer := fmt.Sprintf("https://sts.windows.net/%v/", tokenClaims.TenantID)
+	// v2 tokens have the version appended to the issuer.
 	if tokenClaims.Version == "2.0" {
 		expectedIssuer += "2.0"
 	}
@@ -352,6 +356,12 @@ func (a *Server) RegisterUsingAzureMethod(ctx context.Context, challengeResponse
 
 // fixAzureSigningAlgorithm fixes a mismatch between the object IDs of the
 // hashing algorithm sent by Azure vs the ones expected by the pkcs7 library.
+// Specifically, Azure (incorrectly?) sends a [digest encryption algorithm]
+// where the pkcs7 structure's [signerInfo] expects a [digest algorithm].
+//
+// [signerInfo]: https://www.rfc-editor.org/rfc/rfc2315#section-6.4
+// [digest algorithm]: https://www.rfc-editor.org/rfc/rfc2315#section-6.3
+// [digest encryption algorithm]: https://www.rfc-editor.org/rfc/rfc2315#section-6.4
 func fixAzureSigningAlgorithm(p7 *pkcs7.PKCS7) {
 	for i, signer := range p7.Signers {
 		if signer.DigestAlgorithm.Algorithm.Equal(pkcs7.OIDEncryptionAlgorithmRSASHA256) {
