@@ -15,9 +15,9 @@ The main changes in version 12 of the `teleport-cluster` chart are:
 - Proxies are now deployed as stateless workload. The `proxy` session recording mode uploads recordings asynchronously.
   Non-uploaded records might be lost during rollouts (config changes or version upgrades for example).
   `proxy-sync` ensures consistency and does not have this limitation.
-- `custom` mode is removed as it was broken by the topology change.
+- `custom` mode have been removed as it was broken by the topology change.
   It is replaced by a new configuration override mechanism allowing you to pass arbitrary Teleport configuration.
-- the value `standalone.storage` that was previously deprecated in favor of `persistence` was removed.
+- the values `standalone.*` that were previously deprecated in favor of `persistence` have been removed.
 - The chart can now be scaled up in `standalone` mode. Proxy replication requires
   a TLS certificate; Auth replication require using [HA storage backends](../../reference/backends.mdx).
 - The chart has always been versioned with Teleport but was often compatible with the previous Teleport major version.
@@ -41,7 +41,9 @@ Before upgrading, always:
 
 ### If you use `gcp`, `aws` or `standalone` mode
 
-The upgrade should not require configuration changes. Make sure you don't rely on `standalone.storage` (if you do, switch to using `persistence` values instead)
+The upgrade should not require configuration changes.
+Make sure you don't rely on `standalone.*` for storage configuration (if you do, switch
+to using `persistence` values instead)
 
 Upgrading to v12 will increase the amount of pods deployed as it will deploy auth and proxies separately.
 The chart will try to deploy multiple proxy replicas when possible (proxies can be replicated if certs
@@ -50,6 +52,10 @@ to run the additional Teleport pods:
 
 - `aws` and `gcp` will deploy twice the amount of pods
 - `standalone` will deploy 2 to 3 pods (depending if the proxy can be replicated)
+
+The additional pods might take more time than before to deploy and become ready,
+if you are running helm with `--wait` or `--atomic` make sure to increase your
+timeouts to at least 10 minutes.
 
 ### If you use `custom` mode
 
@@ -64,7 +70,7 @@ Version 12 has introduced a new way to pass arbitrary configuration to Teleport 
 write a full configuration file. If you were using `custom` mode because of a missing chart feature
 (like etcd backend support for example) this might be a better fit for you than managing a fully-custom config.
 
-#### If you only needed a couple of custom configuration overrides
+#### If you deploy a Teleport cluster and only need a couple of custom configuration overrides
 
 You can now use the existing modes `aws`, `gcp` and `standalone` and pass your custom
 configuration overrides through the `auth.teleportConfig` and `proxy.teleportConfig` values.
@@ -116,7 +122,7 @@ proxy:
   `teleport.cluster_name` and `teleport.auth_service.authentication.webauthn.rp_id` MUST NOT change.
 </Admonition>
 
-#### If you need to manage the full configuration
+#### If you deploy a Teleport cluster and need to manage its full configuration
 
 If you need to manage the full configuration you must use the `scratch` mode.
 This mode will generate an empty configuration file and you will pass all your custom configuration
@@ -195,6 +201,39 @@ auth:
       - "trusted_cluster:my-other-secret-token"
       listen_addr: 0.0.0.0:3025
       public_addr: custom.example.com:3025
+```
+
+#### If you deploy Teleport nodes
+
+If you used the `teleport-cluster` chart in `custom` mode to deploy only services
+like `app_service`, `db_service`, `kube_service`, `windows_service` or `discovery_service`,
+you should use the `teleport-kube-agent` chart for this purpose.
+
+The chart offers values to configure `app_service`, `kube_service` and `db_service`,
+but other services can be configured through the `teleportConfig` value.
+
+To migrate to the `teleport-kube-agent` chart from `teleport-cluster`,
+use the following values:
+
+```
+proxyAddr: teleport.example.com
+# pass the token through joinParams instead of `teleportConfig` so it lives
+# in a Kubernetes Secret instead of a ConfigMap
+joinParams:
+  method: token
+  tokenName: PUT-YOUR-JOIN-TOKEN-HERE
+
+# Roles can be empty if you pass all the configuration through `teleportConfig`
+roles: ""
+
+# Put all your previous `teleport.yaml` except the `teleport` section
+teleportConfig:
+  # kubernetes_service:
+  #   enabled: true
+  #   [...]
+  # discovery_service:
+  #   enabled: true
+  #   [...]
 ```
 
 ## Going further
