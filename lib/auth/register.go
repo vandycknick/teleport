@@ -649,11 +649,6 @@ func registerUsingAzureMethod(client joinServiceClient, token string, params Reg
 			AccessToken:  accessToken,
 		}, nil
 	})
-	if err != nil {
-		log.WithError(err).Infof("Failed to register %s", params.ID.Role)
-	} else {
-		log.Infof("Successfully registered %s with Azure method", params.ID.Role)
-	}
 	return certs, trace.Wrap(err)
 }
 
