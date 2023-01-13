@@ -181,6 +181,8 @@ type CLIConf struct {
 	DaemonCertsDir string
 	// DaemonPrehogAddr is the URL where prehog events should be submitted.
 	DaemonPrehogAddr string
+	// TODO
+	DaemonPid int
 	// DatabaseService specifies the database proxy server to log into.
 	DatabaseService string
 	// DatabaseUser specifies database user to embed in the certificate.
@@ -624,6 +626,9 @@ func Run(ctx context.Context, args []string, opts ...cliOption) error {
 	daemonStart.Flag("addr", "Addr is the daemon listening address.").StringVar(&cf.DaemonAddr)
 	daemonStart.Flag("certs-dir", "Directory containing certs used to create secure gRPC connection with daemon service").StringVar(&cf.DaemonCertsDir)
 	daemonStart.Flag("prehog-addr", "URL where prehog events should be submitted").StringVar(&cf.DaemonPrehogAddr)
+	// TODO: Add description.
+	daemonStop := daemon.Command("stop", "TODO").Hidden()
+	daemonStop.Flag("pid", "TODO").IntVar(&cf.DaemonPid)
 
 	// AWS.
 	// Use Interspersed(false) to forward all flags to AWS CLI.
@@ -1130,6 +1135,8 @@ func Run(ctx context.Context, args []string, opts ...cliOption) error {
 		err = onAzure(&cf)
 	case daemonStart.FullCommand():
 		err = onDaemonStart(&cf)
+	case daemonStop.FullCommand():
+		err = onDaemonStop(&cf)
 	case f2Diag.FullCommand():
 		err = onFIDO2Diag(&cf)
 	case tid.diag.FullCommand():
@@ -1154,6 +1161,7 @@ func Run(ctx context.Context, args []string, opts ...cliOption) error {
 			err = trace.BadParameter("command %q not configured", command)
 		}
 	}
+	fmt.Printf("%#v", err)
 
 	if trace.IsNotImplemented(err) {
 		return handleUnimplementedError(ctx, err, cf)
