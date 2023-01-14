@@ -94,6 +94,7 @@ func azureVerifyFuncFromOIDCVerifier(cfg *oidc.Config) azureVerifyTokenFunc {
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
+		// Need to get the tenant ID before we verify so we can construct the issuer URL.
 		var unverifiedClaims accessTokenClaims
 		if err := token.UnsafeClaimsWithoutVerification(&unverifiedClaims); err != nil {
 			return nil, trace.Wrap(err)
@@ -137,24 +138,6 @@ func (cfg *azureRegisterConfig) CheckAndSetDefaults(ctx context.Context) error {
 }
 
 type azureRegisterOption func(cfg *azureRegisterConfig)
-
-func withCerts(certs []*x509.Certificate) azureRegisterOption {
-	return func(cfg *azureRegisterConfig) {
-		cfg.certs = certs
-	}
-}
-
-func withVerifyFunc(verify azureVerifyTokenFunc) azureRegisterOption {
-	return func(cfg *azureRegisterConfig) {
-		cfg.verify = verify
-	}
-}
-
-func withVMClient(vmClient azure.VirtualMachinesClient) azureRegisterOption {
-	return func(cfg *azureRegisterConfig) {
-		cfg.vmClient = vmClient
-	}
-}
 
 // parseAndVeryAttestedData verifies that an attested data document was signed
 // by Azure. If verification is successful, it returns the ID of the VM that
