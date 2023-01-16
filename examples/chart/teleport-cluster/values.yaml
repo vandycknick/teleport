@@ -323,7 +323,7 @@ gcp:
 
 
 # `highAvailability` contains settings controlling how Teleport pods are
-# replicated and scheduled. This allows to run Teleport in a highly-available
+# replicated and scheduled. This allows Teleport to run in a highly-available
 # fashion: Teleport should sustain the crash/loss of a machine without interrupting
 # the service.
 #

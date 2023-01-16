@@ -115,28 +115,6 @@ $ kubectl -n teleport create secret generic license --from-file=license.pem
 
 </ScopedBlock>
 
-You can now deploy Teleport in your cluster with the command:
-
-<ScopedBlock scope={["oss"]}>
-
-```code
-$ helm install teleport teleport/teleport-cluster \
-  --namespace teleport \
-  --values my-values.yaml
-```
-
-</ScopedBlock>
-<ScopedBlock scope={["enterprise"]}>
-
-```code
-$ helm install teleport teleport/teleport-cluster \
-  --namespace teleport \
-  --set enterprise=true \
-  --values my-values.yaml
-```
-
-</ScopedBlock>
-
 You can control the externally-facing name of your cluster using the `public_addr` sections of `teleport.yaml`.
 In this example, our `public_addr`s are set to `custom.example.com`.
 
@@ -153,13 +131,26 @@ In this example, our `public_addr`s are set to `custom.example.com`.
   ```
 </Admonition>
 
-<Admonition type="tip">
-  It will help if you have access to the DNS provider which hosts `example.com` so you can add a `custom.example.com` record
-  and point it to the external IP or hostname of the Kubernetes load balancer.
+You can now deploy Teleport in your cluster with the command:
 
-  Don't worry if you can't - you'll just have to remember to set the proxy's `public_addr` to the external IP or
-  hostname of the Kubernetes load balancer to be able to access Teleport from your local machine.
-</Admonition>
+<Tabs>
+<TabItem scope={["oss"]} label="Open Source">
+```code
+$ helm install teleport teleport/teleport-cluster \
+  --namespace teleport \
+  --values my-values.yaml
+```
+</TabItem>
+
+<TabItem scope={["enterprise"]} label="Enterprise">
+```code
+$ helm install teleport teleport/teleport-cluster \
+  --namespace teleport \
+  --set enterprise=true \
+  --values my-values.yaml
+```
+</TabItem>
+</Tabs>
 
 Once the chart is installed, you can use `kubectl` commands to view the deployment:
 

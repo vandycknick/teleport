@@ -12,7 +12,7 @@ The main changes in version 12 of the `teleport-cluster` chart are:
 
 - Teleport now deploys its auth and proxy services as separate pods.
   Running Teleport with this new topology allows it to be more resilient to disruptions and scale better.
-- Proxies are now deployed as stateless workload. The `proxy` session recording mode uploads recordings asynchronously.
+- Proxies are now deployed as stateless workloads. The `proxy` session recording mode uploads recordings asynchronously.
   Non-uploaded records might be lost during rollouts (config changes or version upgrades for example).
   `proxy-sync` ensures consistency and does not have this limitation.
 - `custom` mode has been removed as it was broken by the topology change.
@@ -20,8 +20,11 @@ The main changes in version 12 of the `teleport-cluster` chart are:
 - The values `standalone.*` that were previously deprecated in favor of `persistence` have been removed.
 - The chart can now be scaled up in `standalone` mode. Proxy replication requires
   a TLS certificate; Auth replication requires using [HA storage backends](../../reference/backends.mdx).
-- The chart has always been versioned with Teleport but was often compatible with the previous Teleport major version.
-  This is not the case for v12. Using the chart v12 requires at least Teleport v12.
+
+<Admonition type="warning" title="Version compatibility">
+The chart has always been versioned with Teleport but was often compatible with the previous Teleport major version.
+This is not the case for v12. Using the chart v12 requires at least Teleport v12.
+</Admonition>
 
 ## How to upgrade
 
@@ -51,7 +54,7 @@ are provided through a secret or `cert-manager`). Make sure you have enough room
 to run the additional Teleport pods:
 
 - `aws` and `gcp` will deploy twice the amount of pods
-- `standalone` will deploy 2 to 3 pods (depending if the proxy can be replicated)
+- `standalone` will deploy 1 or 2 additional pods (depending if the proxy can be replicated)
 
 The additional pods might take more time than before to deploy and become ready.
 If you are running helm with `--wait` or `--atomic` make sure to increase your
@@ -286,4 +289,3 @@ auth:
   highAvailability:
     requireAntiAffinity: true
 ```
-
