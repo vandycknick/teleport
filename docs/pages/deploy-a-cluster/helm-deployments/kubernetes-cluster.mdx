@@ -109,14 +109,14 @@ to create a public IP for Teleport.
 
     # Service is up, load balancer is created
     $ kubectl get services
-    # NAME                    TYPE           CLUSTER-IP   EXTERNAL-IP      PORT(S)                        AGE
-    # teleport-cluster        LoadBalancer   10.4.4.73    104.199.126.88   443:31204/TCP,3026:32690/TCP   89s
-    # teleport-cluster-auth   ClusterIP      10.4.2.51    <none>           3025/TCP,3026/TCP              89s
+    NAME                    TYPE           CLUSTER-IP   EXTERNAL-IP      PORT(S)                        AGE
+    teleport-cluster        LoadBalancer   10.4.4.73    104.199.126.88   443:31204/TCP,3026:32690/TCP   89s
+    teleport-cluster-auth   ClusterIP      10.4.2.51    <none>           3025/TCP,3026/TCP              89s
 
     # Save the pod IP or hostname.
     $ MYIP=$(kubectl get services teleport-cluster -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
     $ echo $MYIP
-    # 104.199.126.88
+    104.199.126.88
     ```
 
     If `$MYIP` is blank, your cloud provider may have assigned a hostname to the load balancer rather than an IP address. Run the following command to retrieve the hostname, which you will use in place of `$MYIP` for subsequent commands.
@@ -133,14 +133,14 @@ to create a public IP for Teleport.
 
     # Service is up, load balancer is created
     $ kubectl get services
-    # NAME                        TYPE           CLUSTER-IP   EXTERNAL-IP      PORT(S)                        AGE
-    # teleport-cluster-ent        LoadBalancer   10.4.4.73    104.199.126.88   443:31204/TCP,3026:32690/TCP   89s
-    # teleport-cluster-ent-auth   ClusterIP      10.4.2.51    <none>           3025/TCP,3026/TCP              89s
+    NAME                        TYPE           CLUSTER-IP   EXTERNAL-IP      PORT(S)                        AGE
+    teleport-cluster-ent        LoadBalancer   10.4.4.73    104.199.126.88   443:31204/TCP,3026:32690/TCP   89s
+    teleport-cluster-ent-auth   ClusterIP      10.4.2.51    <none>           3025/TCP,3026/TCP              89s
 
     # Save the pod IP or hostname.
     $ MYIP=$(kubectl get services teleport-cluster-ent -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
     $ echo $MYIP
-    # 104.199.126.88
+    104.199.126.88
     ```
 
     If `$MYIP` is blank, your cloud provider may have assigned a hostname to the load balancer rather than an IP address. Run the following command to retrieve the hostname, which you will use in place of `$MYIP` for subsequent commands.
@@ -253,19 +253,20 @@ Teleport updates `KUBECONFIG` with a short-lived 12-hour certificate.
 # List connected Kubernetes clusters
 $ tsh kube ls
 
-# Kube Cluster Name Selected
-# ----------------- --------
-# tele.example.com
-# Login to Kubernetes by name
+Kube Cluster Name Selected
+----------------- --------
+tele.example.com
+Login to Kubernetes by name
+
 $ tsh kube login tele.example.com
 
 # Once working, remove the KUBECONFIG= override to switch to teleport
 $ KUBECONFIG=${HOME?}/teleport.yaml kubectl get -n teleport-cluster pods
-# NAME                                  READY   STATUS    RESTARTS   AGE
-# pod/teleport-auth-0                   1/1     Running   0          127m
-# pod/teleport-auth-1                   1/1     Running   0          127m
-# pod/teleport-proxy-69c9c4c986-j9v2j   1/1     Running   0          127m
-# pod/teleport-proxy-69c9c4c986-qhh5f   1/1     Running   0          127m
+NAME                                  READY   STATUS    RESTARTS   AGE
+pod/teleport-auth-0                   1/1     Running   0          127m
+pod/teleport-auth-1                   1/1     Running   0          127m
+pod/teleport-proxy-69c9c4c986-j9v2j   1/1     Running   0          127m
+pod/teleport-proxy-69c9c4c986-qhh5f   1/1     Running   0          127m
 ```
 
 ## Step 3/3. SSO for Kubernetes
@@ -332,14 +333,14 @@ To create a connector, we are going to run Teleport's admin tool `tctl` from the
     $ kubectl config set-context --current --namespace=teleport-cluster
 
     $ kubectl exec -i statefulset/teleport-cluster-auth -- tctl create -f < github.yaml
-    # authentication connector "github" has been created
+    authentication connector "github" has been created
     ```
   </TabItem>
 
   <TabItem label="Enterprise"  scope={["enterprise"]}>
     ```code
     $ kubectl exec -i statefulset/teleport-cluster-ent-auth -- tctl create -f < okta.yaml
-    # authentication connector 'okta' has been created
+    authentication connector 'okta' has been created
     ```
   </TabItem>
 </Tabs>
@@ -370,7 +371,7 @@ the default one in case there is a problem.
   ```code
   $ kubectl exec -ti statefulset/teleport-cluster-auth -- tail -n 100 /var/lib/teleport/log/events.log
 
-  # {"error":"user \"alice\" does not belong to any teams configured in \"github\" connector","method":"github","attributes":{"octocats":["devs"]}}
+  {"error":"user \"alice\" does not belong to any teams configured in \"github\" connector","method":"github","attributes":{"octocats":["devs"]}}
   ```
 </Admonition>
 
