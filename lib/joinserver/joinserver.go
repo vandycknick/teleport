@@ -132,14 +132,20 @@ func (s *JoinServiceGRPCServer) registerUsingIAMMethod(ctx context.Context, srv 
 func (s *JoinServiceGRPCServer) RegisterUsingAzureMethod(srv proto.JoinService_RegisterUsingAzureMethodServer) error {
 	ctx := srv.Context()
 
+	// Enforce a timeout on the entire RPC so that misbehaving clients cannot
+	// hold connections open indefinitely.
 	timeout := s.clock.After(azureJoinRequestTimeout)
 
+	// The only way to cancel a blocked Send or Recv on the server side without
+	// adding an interceptor to the entire gRPC service is to return from the
+	// handler https://github.com/grpc/grpc-go/issues/465#issuecomment-179414474
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- s.registerUsingAzureMethod(ctx, srv)
 	}()
 	select {
 	case err := <-errCh:
+		// Completed before the deadline, return the error (may be nil).
 		return trace.Wrap(err)
 	case <-timeout:
 		nodeAddr := ""

@@ -23,6 +23,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net"
+	"net/url"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -192,10 +193,16 @@ func verifyVMIdentity(ctx context.Context, cfg *azureRegisterConfig, accessToken
 		return nil, trace.Wrap(err)
 	}
 
-	expectedIssuer := fmt.Sprintf("https://sts.windows.net/%v/", tokenClaims.TenantID)
+	expectedIssuer, err := url.JoinPath("https://sts.windows.net", tokenClaims.TenantID, "/")
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
 	// v2 tokens have the version appended to the issuer.
 	if tokenClaims.Version == "2.0" {
-		expectedIssuer += "2.0"
+		expectedIssuer, err = url.JoinPath(expectedIssuer, "2.0")
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
 	}
 
 	expectedClaims := jwt.Expected{
