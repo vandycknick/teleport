@@ -2,14 +2,14 @@ ARG BASE_IMAGE=gcr.io/distroless/cc-debian11
 
 FROM debian:11 AS staging
 RUN apt-get update 
-COPY fetch .
+COPY fetch ./fetch-debs
 RUN ./fetch-debs dumb-init libpam0g libaudit1 libcap-ng0
 
 FROM debian:11 AS teleport
 ARG TELEPORT_DEB_FILE_NAME
 COPY teleport_*.deb .
 RUN dpkg-deb -R $TELEPORT_DEB_FILE_NAME /opt/staging && \
-    mv /opt/staging/DEBIAN/control /opt/staging/status/teleport && \
+    mv /opt/staging/DEBIAN/control /var/lib/dpkg/status.d/teleport && \
     rm -rf /opt/staging/DEBIAN
 
 FROM $BASE_IMAGE
