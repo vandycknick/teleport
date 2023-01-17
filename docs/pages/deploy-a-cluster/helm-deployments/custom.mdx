@@ -37,18 +37,24 @@ configuration and lets you pass your custom configuration through the chart's va
 `teleport-cluster` deploys two sets of pods: proxy and auth.
 You must provide two configurations, one for each pod type.
 
-- The `proxy` pod configuration should contain at least the `proxy_service` section and the `teleport` section without the `storage` part.
-- The `auth` pod configuration should contain at least the `auth_service` and `teleport` sections.
+- The `proxy` pod configuration should contain at least the `proxy_service`
+  section and the `teleport` section without the `storage` part.
+- The `auth` pod configuration should contain at least the `auth_service` and
+  `teleport` sections.
 
-The chart automatically creates a Kubernetes join token, named after the Helm release, which will enable the proxy pods to seamlessly connect to the auth pods.
-If you do not want to use this automatic token, you must provide a valid Teleport join token in the proxy pods' configuration.
+The chart automatically creates a Kubernetes join token, named after the Helm
+release, which will enable the proxy pods to seamlessly connect to the auth pods.
+If you do not want to use this automatic token, you must provide a valid
+Teleport join token in the proxy pods' configuration.
 
 <Admonition type="warning">
-When using `scratch` or `standalone` mode, you **must** use highly-available storage (e.g. etcd, DynamoDB, or Firestore) for multiple replicas to be supported.
+When using `scratch` or `standalone` mode, you **must** use highly-available
+storage (e.g. etcd, DynamoDB, or Firestore) for multiple replicas to be supported.
 
 [Information on supported Teleport storage backends](../../reference/backends.mdx)
 
-Manually configuring NFS-based storage or `ReadWriteMany` volume claims is **NOT** supported for an HA deployment and will result in errors.
+Manually configuring NFS-based storage or `ReadWriteMany` volume claims is **NOT**
+supported for an HA deployment and will result in errors.
 </Admonition>
 
 Write the following `my-values.yaml` file, and adapt the teleport configuration as needed.
@@ -100,6 +106,9 @@ proxy:
 #   replicaCount: 2
 ```
 
+You can control the externally-facing name of your cluster using the `public_addr`
+sections of `teleport.yaml`. In this example, our `public_addr`s are set to
+`custom.example.com`.
 
 <ScopedBlock scope="enterprise">
 
@@ -119,40 +128,43 @@ $ kubectl -n teleport create secret generic license --from-file=license.pem
 
 </ScopedBlock>
 
-You can control the externally-facing name of your cluster using the `public_addr` sections of `teleport.yaml`.
-In this example, our `public_addr`s are set to `custom.example.com`.
-
 <Admonition type="note" title="External proxy port">
-  Note that although the `proxy_service` listens on port 3080 inside the pod, the default `LoadBalancer` service configured by the chart
-  will always listen externally on port 443 (which is redirected internally to port 3080).
+Note that although the `proxy_service` listens on port 3080 inside the pod,
+the default `LoadBalancer` service configured by the chart will always listen
+externally on port 443 (which is redirected internally to port 3080).
 
-  Due to this, your `proxy_service.public_addr` should always end in `:443`:
+Due to this, your `proxy_service.public_addr` should always end in `:443`:
 
-  ```yaml
-  proxy_service:
-    listen_addr: 0.0.0.0:3080
-    public_addr: custom.example.com:443
-  ```
+```yaml
+proxy_service:
+  listen_addr: 0.0.0.0:3080
+  public_addr: custom.example.com:443
+```
+
 </Admonition>
 
 You can now deploy Teleport in your cluster with the command:
 
 <Tabs>
 <TabItem scope={["oss"]} label="Open Source">
+
 ```code
 $ helm install teleport teleport/teleport-cluster \
   --namespace teleport \
   --values my-values.yaml
 ```
+
 </TabItem>
 
 <TabItem scope={["enterprise"]} label="Enterprise">
+
 ```code
 $ helm install teleport teleport/teleport-cluster \
   --namespace teleport \
   --set enterprise=true \
   --values my-values.yaml
 ```
+
 </TabItem>
 </Tabs>
 
@@ -181,8 +193,9 @@ statefulset.apps/teleport-auth   1/1     5h8m
 
 ## Step 4/4. Create a Teleport user (optional)
 
-If you're not migrating an existing Teleport cluster, you'll need to create a user to be able to log into Teleport. This needs to be done on the
-Teleport auth server, so we can run the command using `kubectl`:
+If you're not migrating an existing Teleport cluster, you'll need to create a
+user to be able to log into Teleport. This needs to be done on the Teleport
+auth server, so we can run the command using `kubectl`:
 
 ```code
 $ kubectl --namespace teleport exec statefulset/teleport-auth -- tctl users add test --roles=access,editor
@@ -194,23 +207,28 @@ NOTE: Make sure custom.example.com:443 points at a Teleport proxy that users can
 ```
 
 <Admonition type="note">
-  If you didn't set up DNS for your hostname earlier, remember to replace `custom.example.com` with the external IP or hostname of the
-  Kubernetes load balancer.
+If you didn't set up DNS for your hostname earlier, remember to replace
+`custom.example.com` with the external IP or hostname of the Kubernetes load
+balancer.
 
-  (!docs/pages/kubernetes-access/helm/includes/kubernetes-externaladdress.mdx!)
+(!docs/pages/kubernetes-access/helm/includes/kubernetes-externaladdress.mdx!)
 
-  You should modify your command accordingly and replace `custom.example.com` with either the IP or hostname depending on which you have available. You may need to accept insecure warnings in your browser to view the page successfully.
+You should modify your command accordingly and replace `custom.example.com` with
+either the IP or hostname depending on which you have available. You may need
+to accept insecure warnings in your browser to view the page successfully.
 </Admonition>
 
 <Admonition type="warning">
-  Using a Kubernetes-issued load balancer IP or hostname is OK for testing but is not viable when running a production Teleport cluster
-  as the Subject Alternative Name on any public-facing certificate will be expected to match the cluster's configured public address (specified
-  using `public_addr` in your configuration)
+Using a Kubernetes-issued load balancer IP or hostname is OK for testing but is
+not viable when running a production Teleport cluster as the Subject Alternative
+Name on any public-facing certificate will be expected to match the cluster's
+configured public address (specified using `public_addr` in your configuration)
 
-  You must configure DNS properly using the methods described above for production workloads.
+You must configure DNS properly using the methods described above for production workloads.
 </Admonition>
 
-Load the user creation link to create a password and set up 2-factor authentication for the Teleport user via the web UI.
+Load the user creation link to create a password and set up 2-factor
+authentication for the Teleport user via the web UI.
 
 ## Uninstalling the Helm chart
 
@@ -221,7 +239,8 @@ $ helm --namespace teleport uninstall teleport
 ```
 
 <Admonition type="note">
-  To change `chartMode`, you must first uninstall the existing chart and then install a new version with the appropriate values.
+To change `chartMode`, you must first uninstall the existing chart and then
+install a new version with the appropriate values.
 </Admonition>
 
 ## Next steps
@@ -230,5 +249,5 @@ To see all of the options you can set in the values file for the
 `teleport-cluster` Helm chart, consult our [reference
 guide](../../reference/helm-reference/teleport-cluster.mdx).
 
-You can follow our [Getting Started with Teleport guide](../../management/guides/docker.mdx#step-34-creating-a-teleport-user) to finish setting up your
-Teleport cluster.
+You can follow our [Getting Started with Teleport guide](../../management/guides/docker.mdx#step-34-creating-a-teleport-user)
+to finish setting up your Teleport cluster.
