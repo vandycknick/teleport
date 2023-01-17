@@ -77,8 +77,12 @@ proxy:
       # By default, the chart creates a Kubernetes join token which you can use.
       join_params:
         method: kubernetes
-        token_name: "RELEASE-NAME-proxy"  # replace RELEASE-NAME
-      auth_server: "RELEASE-NAME-auth.RELEASE-NAMESPACE.svc.cluster.local:3025"  # replace RELEASE-NAME and RELEASE-NAMESPACE
+        # The token name pattern is "<RELEASE-NAME>-proxy"
+        # Change this if you change the Helm release name.
+        token_name: "teleport-proxy"
+      # The auth server domain pattern is "<RELEASE-NAME>-auth.<RELEASE-NAMESPACE>.svc.cluster.local:3025"
+      # If you change the Helm release name or namespace you must adapt the `auth_server` value.
+      auth_server: "teleport-auth.teleport.svc.cluster.local:3025"
       log:
         output: stderr
         severity: INFO
