@@ -505,6 +505,11 @@
               "forScopes": ["oss", "enterprise"]
             },
             {
+              "title": "Joining Nodes via Kubernetes ServiceAccount Tokens",
+              "slug": "/management/guides/joining-nodes-kubernetes-serviceaccount/",
+              "forScopes": ["oss", "enterprise"]
+            },
+            {
               "title": "Using Teleport's CA with GitHub",
               "slug": "/management/guides/ssh-key-extensions/"
             }
