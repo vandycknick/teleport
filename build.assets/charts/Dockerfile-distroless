@@ -2,7 +2,7 @@ ARG BASE_IMAGE=gcr.io/distroless/cc-debian11
 
 FROM debian:11 AS staging
 RUN apt-get update 
-COPY fetch ./fetch-debs
+COPY fetch-debs ./
 RUN ./fetch-debs dumb-init libpam0g libaudit1 libcap-ng0
 
 FROM debian:11 AS teleport
