@@ -6,6 +6,6 @@ for pkg in "$@"; do
     apt-get download "$pkg" && dpkg-deb -R $pkg*.deb /tmp/$pkg
     cp /tmp/$pkg/DEBIAN/control /opt/staging/status/$pkg
     rm -r /tmp/$pkg/DEBIAN
-    cp -r /tmp/$pkg/* /opt/staging
+    cp -r /tmp/$pkg/* /opt/staging/root
     rm -rf /tmp/$pkg
 done

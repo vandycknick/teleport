@@ -9,6 +9,7 @@ FROM debian:11 AS teleport
 ARG TELEPORT_DEB_FILE_NAME
 COPY $TELEPORT_DEB_FILE_NAME ./$TELEPORT_DEB_FILE_NAME
 RUN dpkg-deb -R $TELEPORT_DEB_FILE_NAME /opt/staging && \
+    mkdir -p /opt/staging/etc/teleport && \
     mkdir -p /opt/staging/var/lib/dpkg/status.d/ && \
     mv /opt/staging/DEBIAN/control /opt/staging/var/lib/dpkg/status.d/teleport && \
     rm -rf /opt/staging/DEBIAN
