@@ -7,9 +7,10 @@ RUN ./fetch-debs dumb-init libpam0g libaudit1 libcap-ng0
 
 FROM debian:11 AS teleport
 ARG TELEPORT_DEB_FILE_NAME
-COPY teleport_*.deb .
+COPY $TELEPORT_DEB_FILE_NAME ./$TELEPORT_DEB_FILE_NAME
 RUN dpkg-deb -R $TELEPORT_DEB_FILE_NAME /opt/staging && \
-    mv /opt/staging/DEBIAN/control /var/lib/dpkg/status.d/teleport && \
+    mkdir -p /opt/staging/var/lib/dpkg/status.d/ && \
+    mv /opt/staging/DEBIAN/control /opt/staging/var/lib/dpkg/status.d/teleport && \
     rm -rf /opt/staging/DEBIAN
 
 FROM $BASE_IMAGE
