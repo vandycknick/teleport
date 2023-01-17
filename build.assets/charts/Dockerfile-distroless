@@ -1,0 +1,16 @@
+ARG BASE_IMAGE=gcr.io/distroless/cc-debian11
+
+FROM debian:11 AS staging
+RUN apt-get update 
+COPY fetch .
+RUN ./fetch-debs dumb-init libpam0g libaudit1 libcap-ng0
+
+FROM debian:11 AS teleport
+COPY teleport_*.deb .
+RUN dpkg-deb -R teleport_*.deb /opt/staging && rm -rf /opt/staging/DEBIAN
+
+FROM $BASE_IMAGE
+COPY --from=teleport /opt/staging /
+COPY --from=staging /opt/staging/root /
+COPY --from=staging /opt/staging/status /var/lib/dpkg/status.d
+ENTRYPOINT ["/usr/bin/dumb-init", "/usr/local/bin/teleport", "start", "-c", "/etc/teleport/teleport.yaml"]
