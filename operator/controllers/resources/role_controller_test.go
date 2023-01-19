@@ -185,7 +185,7 @@ allow:
 
 			roleName := validRandomResourceName("role-")
 
-			obj := getUnstructuredObjectFromGVK(teleportRoleGVKV5)
+			obj := getUnstructuredObjectFromGVK(teleportRoleGVKV6)
 			obj.Object["spec"] = roleManifest
 			obj.SetName(roleName)
 			obj.SetNamespace(setup.namespace.Name)

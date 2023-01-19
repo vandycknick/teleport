@@ -49,6 +49,9 @@ type TeleportRole struct {
 
 	Spec   TeleportRoleSpec   `json:"spec,omitempty"`
 	Status TeleportRoleStatus `json:"status,omitempty"`
+	// Version field is used to carry the Teleport resource version between
+	// conversion and hubs.
+	Version string `json:"version,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -63,7 +66,7 @@ type TeleportRoleList struct {
 func (r TeleportRole) ToTeleport() types.Role {
 	return &types.RoleV6{
 		Kind:    types.KindRole,
-		Version: types.V6,
+		Version: r.version(),
 		Metadata: types.Metadata{
 			Name:        r.Name,
 			Labels:      r.Labels,
@@ -71,6 +74,13 @@ func (r TeleportRole) ToTeleport() types.Role {
 		},
 		Spec: types.RoleSpecV6(r.Spec),
 	}
+}
+
+func (r TeleportRole) version() string {
+	if r.Version != "" {
+		return r.Version
+	}
+	return types.V6
 }
 
 func init() {

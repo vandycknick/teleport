@@ -29,7 +29,7 @@ import (
 	kclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/gravitational/teleport/api/types"
-	resourcesv5 "github.com/gravitational/teleport/operator/apis/resources/v5"
+	resourcesv6 "github.com/gravitational/teleport/operator/apis/resources/v6"
 	"github.com/gravitational/teleport/operator/sidecar"
 )
 
@@ -39,9 +39,9 @@ const teleportRoleKind = "TeleportRole"
 // This means we'll have to move back to a statically typed client.
 // This will require removing the crdgen hack, fixing TeleportRole JSON serialization
 
-var teleportRoleGVKV5 = schema.GroupVersionKind{
-	Group:   resourcesv5.GroupVersion.Group,
-	Version: resourcesv5.GroupVersion.Version,
+var teleportRoleGVKV6 = schema.GroupVersionKind{
+	Group:   resourcesv6.GroupVersion.Group,
+	Version: resourcesv6.GroupVersion.Version,
 	Kind:    teleportRoleKind,
 }
 
@@ -68,7 +68,7 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	// The unstructured object will be converted later to a typed one, in r.UpsertExternal.
 	// See `/operator/crdgen/schemagen.go` and https://github.com/gravitational/teleport/issues/15204 for context.
 	// TODO: (Check how to handle multiple versions)
-	obj := getUnstructuredObjectFromGVK(teleportRoleGVKV5)
+	obj := getUnstructuredObjectFromGVK(teleportRoleGVKV6)
 	return ResourceBaseReconciler{
 		Client:         r.Client,
 		DeleteExternal: r.Delete,
@@ -84,7 +84,7 @@ func (r *RoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// The unstructured object will be converted later to a typed one, in r.UpsertExternal.
 	// See `/operator/crdgen/schemagen.go` and https://github.com/gravitational/teleport/issues/15204 for context
 	// TODO: (Check how to handle multiple versions)
-	obj := getUnstructuredObjectFromGVK(teleportRoleGVKV5)
+	obj := getUnstructuredObjectFromGVK(teleportRoleGVKV6)
 	return ctrl.NewControllerManagedBy(mgr).
 		For(obj).
 		Complete(r)
@@ -104,7 +104,7 @@ func (r *RoleReconciler) Upsert(ctx context.Context, obj kclient.Object) error {
 	if !ok {
 		return fmt.Errorf("failed to convert Object into resource object: %T", obj)
 	}
-	k8sResource := &resourcesv5.TeleportRole{}
+	k8sResource := &resourcesv6.TeleportRole{}
 
 	// If an error happens we want to put it in status.conditions before returning.
 	err := runtime.DefaultUnstructuredConverter.FromUnstructuredWithValidation(

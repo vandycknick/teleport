@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -36,9 +37,11 @@ import (
 
 	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/api/utils/retryutils"
+
 	resourcesv2 "github.com/gravitational/teleport/operator/apis/resources/v2"
 	resourcesv3 "github.com/gravitational/teleport/operator/apis/resources/v3"
 	resourcesv5 "github.com/gravitational/teleport/operator/apis/resources/v5"
+	resourcesv6 "github.com/gravitational/teleport/operator/apis/resources/v6"
 	resourcescontrollers "github.com/gravitational/teleport/operator/controllers/resources"
 	"github.com/gravitational/teleport/operator/sidecar"
 	//+kubebuilder:scaffold:imports
@@ -174,6 +177,15 @@ func main() {
 		}
 	} else {
 		setupLog.Info("SAML connectors are only available in Teleport Enterprise edition. TeleportSAMLConnector resources won't be reconciled")
+	}
+
+	if err = (&resourcesv6.TeleportRole{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "TeleportRoleV6")
+		os.Exit(1)
+	}
+	if err = (&resourcesv5.TeleportRole{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "TeleportRoleV5")
+		os.Exit(1)
 	}
 
 	//+kubebuilder:scaffold:builder
