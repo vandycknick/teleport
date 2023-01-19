@@ -108,6 +108,8 @@ type CertAuthority struct {
 
 // Identity is an identity of the user or service, e.g. Proxy or Node
 type Identity struct {
+	// PublicKey is the public key on the user's certificate.
+	PublicKey crypto.PublicKey
 	// Username is a username or name of the node connection
 	Username string
 	// Impersonator is a username of a user impersonating this user

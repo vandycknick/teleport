@@ -18,6 +18,7 @@ package auth
 
 import (
 	"context"
+	"crypto"
 	"fmt"
 	"net/url"
 	"strings"
@@ -28,6 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 	collectortracev1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	otlpcommonv1 "go.opentelemetry.io/proto/otlp/common/v1"
+	"golang.org/x/crypto/ssh"
 	"golang.org/x/exp/slices"
 
 	"github.com/gravitational/teleport"
@@ -2445,6 +2447,15 @@ func (a *ServerWithRoles) generateUserCerts(ctx context.Context, req proto.UserC
 
 	if a.context.Identity.GetIdentity().DisallowReissue {
 		return nil, trace.AccessDenied("access denied: identity is not allowed to reissue certificates")
+	}
+
+	sshPub, _, _, _, err := ssh.ParseAuthorizedKey(req.PublicKey)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	if !a.context.Identity.GetIdentity().PublicKey.(interface{ Equal(x crypto.PublicKey) bool }).Equal(sshPub.(interface{ CryptoPublicKey() crypto.PublicKey }).CryptoPublicKey()) {
+		return nil, trace.AccessDenied("access denied: mismatched public key")
 	}
 
 	// Prohibit recursive impersonation behavior:

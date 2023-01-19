@@ -500,6 +500,8 @@ func (a *Middleware) GetUser(connState tls.ConnectionState) (IdentityGetter, err
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
+	identity.PublicKey = clientCert.PublicKey
+
 	// Since 5.0, teleport TLS certs include the origin teleport cluster in the
 	// subject (identity). Before 5.0, origin teleport cluster was inferred
 	// from the cert issuer.
