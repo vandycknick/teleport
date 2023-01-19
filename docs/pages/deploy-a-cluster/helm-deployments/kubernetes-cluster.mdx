@@ -186,10 +186,10 @@ Create the role and add a user:
   <TabItem label="Open Source">
     ```code
     # Create a role
-    $ kubectl exec -i statefulset/teleport-cluster-auth -- tctl create -f < member.yaml
+    $ kubectl exec -i deployment/teleport-cluster-auth -- tctl create -f < member.yaml
 
     # Generate an invite link for the user.
-    $ kubectl exec -ti statefulset/teleport-cluster-auth -- tctl  users add alice --roles=member
+    $ kubectl exec -ti deployment/teleport-cluster-auth -- tctl  users add alice --roles=member
 
     # User "alice" has been created but requires a password. Share this URL with the user to
     # complete user setup, link is valid for 1h:
@@ -202,10 +202,10 @@ Create the role and add a user:
   <TabItem label="Enterprise" scope={["enterprise"]}>
     ```code
     # Create a role
-    $ kubectl exec -i statefulset/teleport-cluster-ent-auth -- tctl create -f < member.yaml
+    $ kubectl exec -i deployment/teleport-cluster-ent-auth -- tctl create -f < member.yaml
 
     # Generate an invite link for the user.
-    $ kubectl exec -ti statefulset/teleport-cluster-ent-auth -- tctl  users add alice --roles=member
+    $ kubectl exec -ti deployment/teleport-cluster-ent-auth -- tctl  users add alice --roles=member
 
     # User "alice" has been created but requires a password. Share this URL with the user to
     # complete user setup, link is valid for 1h:
@@ -262,11 +262,11 @@ $ tsh kube login tele.example.com
 
 # Once working, remove the KUBECONFIG= override to switch to teleport
 $ KUBECONFIG=${HOME?}/teleport.yaml kubectl get -n teleport-cluster pods
-NAME                                  READY   STATUS    RESTARTS   AGE
-pod/teleport-auth-0                   1/1     Running   0          127m
-pod/teleport-auth-1                   1/1     Running   0          127m
-pod/teleport-proxy-69c9c4c986-j9v2j   1/1     Running   0          127m
-pod/teleport-proxy-69c9c4c986-qhh5f   1/1     Running   0          127m
+NAME                                      READY   STATUS    RESTARTS   AGE
+pod/teleport-cluster-auth-57989d4-4q2ds   1/1     Running   0          22h
+pod/teleport-cluster-auth-57989d4-rtrzn   1/1     Running   0          22h
+pod/teleport-cluster-proxy-c6bf55-w96d2   1/1     Running   0          22h
+pod/teleport-cluster-proxy-c6bf55-z256w   1/1     Running   0          22h
 ```
 
 ## Step 3/3. SSO for Kubernetes
@@ -332,14 +332,14 @@ To create a connector, we are going to run Teleport's admin tool `tctl` from the
     ```code
     $ kubectl config set-context --current --namespace=teleport-cluster
 
-    $ kubectl exec -i statefulset/teleport-cluster-auth -- tctl create -f < github.yaml
+    $ kubectl exec -i deployment/teleport-cluster-auth -- tctl create -f < github.yaml
     authentication connector "github" has been created
     ```
   </TabItem>
 
   <TabItem label="Enterprise"  scope={["enterprise"]}>
     ```code
-    $ kubectl exec -i statefulset/teleport-cluster-ent-auth -- tctl create -f < okta.yaml
+    $ kubectl exec -i deployment/teleport-cluster-ent-auth -- tctl create -f < okta.yaml
     authentication connector 'okta' has been created
     ```
   </TabItem>
@@ -369,7 +369,7 @@ the default one in case there is a problem.
   If you are getting a login error, take a look at the audit log for details:
 
   ```code
-  $ kubectl exec -ti statefulset/teleport-cluster-auth -- tail -n 100 /var/lib/teleport/log/events.log
+  $ kubectl exec -ti deployment/teleport-cluster-auth -- tail -n 100 /var/lib/teleport/log/events.log
 
   {"error":"user \"alice\" does not belong to any teams configured in \"github\" connector","method":"github","attributes":{"octocats":["devs"]}}
   ```

@@ -14,8 +14,8 @@ The `teleport-cluster` chart runs three Teleport services, split into two sets o
 
 | Teleport service | Running in | Purpose | Documentation |
 | - | - | - | - |
-| `auth_service` | auth `StatefulSet` | Authenticates users and hosts, and issues certificates. | [Auth documentation](../../architecture/authentication.mdx)
-| `kubernetes_service` | auth `StatefulSet` | Provides secure access to the Kubernetes<br/>cluster where the Teleport cluster is hosted. | [Kubernetes Access documentation](../../kubernetes-access/introduction.mdx) |
+| `auth_service` | auth `Deployment` | Authenticates users and hosts, and issues certificates. | [Auth documentation](../../architecture/authentication.mdx)
+| `kubernetes_service` | auth `Deployment` | Provides secure access to the Kubernetes<br/>cluster where the Teleport cluster is hosted. | [Kubernetes Access documentation](../../kubernetes-access/introduction.mdx) |
 | `proxy_service` | proxy `Deployment` | Runs the externally-facing parts of a Teleport<br/>cluster, such as the web UI, SSH proxy and reverse tunnel service. | [Proxy documentation](../../architecture/proxy.mdx) |
 
 <Admonition type="tip" title="Additional Kubernetes Clusters and Teleport Services">
@@ -964,7 +964,7 @@ replicated and scheduled. This allows Teleport to run in a highly-available
 fashion: Teleport should sustain the crash/loss of a machine without interrupting
 the service.
 
-#### For auth pods
+### For auth pods
 
 When using "standalone" or "scratch" mode, you must use highly-available storage
 (etcd, DynamoDB or Firestore) for multiple replicas to be supported.
@@ -973,7 +973,7 @@ is NOT supported and will result in errors. Using Teleport's built-in
 ACME client (as opposed to using cert-manager or passing certs through a secret)
 is not supported with multiple replicas.
 
-#### For proxy pods
+### For proxy pods
 
 Proxy pods need to be provided a certificate to be replicated (via either
 `tls.existingSecretName` or `highAvailability.certManager`).

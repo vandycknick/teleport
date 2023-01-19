@@ -132,7 +132,7 @@ Once you get the value for the external IP (it may take a few minutes for this f
 Now we create a Teleport user by executing the `tctl` command with `kubectl`.
 
 ```code
-$ kubectl --namespace teleport-cluster exec statefulset/teleport-cluster-auth -- tctl users add tadmin --roles=access,editor --logins=ubuntu
+$ kubectl --namespace teleport-cluster exec deployment/teleport-cluster-auth -- tctl users add tadmin --roles=access,editor --logins=ubuntu
 
 User "tadmin" has been created but requires a password. Share this URL with the user to complete user setup, link is valid for 1h:
 https://tele.example.com:443/web/invite/<invite-token>
@@ -172,7 +172,7 @@ spec:
 Next, create this role in Kubernetes with the command:
 
 ```code
-$ kubectl --namespace=teleport-cluster exec -i statefulset/teleport-cluster-auth -- tctl create -f < member.yaml
+$ kubectl --namespace=teleport-cluster exec -i deployment/teleport-cluster-auth -- tctl create -f < member.yaml
 ```
 
 ### Assign the "member" role to user "tadmin"

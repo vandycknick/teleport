@@ -362,24 +362,25 @@ Once the chart is installed, you can use `kubectl` commands to view the deployme
 ```code
 $ kubectl --namespace teleport get all
 
-NAME                                  READY   STATUS    RESTARTS   AGE
-pod/teleport-auth-0                   1/1     Running   0          7m16s
-pod/teleport-auth-1                   1/1     Running   0          7m16s
-pod/teleport-proxy-69c9c4c986-j9v2j   1/1     Running   0          7m16s
-pod/teleport-proxy-69c9c4c986-qhh5f   1/1     Running   0          7m16s
+NAME                                 READY   STATUS    RESTARTS   AGE
+pod/teleport-auth-57989d4cbd-4q2ds   1/1     Running   0          22h
+pod/teleport-auth-57989d4cbd-rtrzn   1/1     Running   0          22h
+pod/teleport-proxy-c6bf55cfc-w96d2   1/1     Running   0          22h
+pod/teleport-proxy-c6bf55cfc-z256w   1/1     Running   0          22h
 
-NAME                    TYPE           CLUSTER-IP     EXTERNAL-IP    PORT(S)                                                      AGE
-service/teleport        LoadBalancer   10.40.14.191   35.203.56.38   443:31758/TCP,3023:30409/TCP,3026:30939/TCP,3024:31403/TCP   7m16s
-service/teleport-auth   ClusterIP      10.40.15.135   <none>         3025/TCP,3026/TCP                                            7m16s
+NAME                        TYPE           CLUSTER-IP     EXTERNAL-IP     PORT(S)                                                                     AGE
+service/teleport            LoadBalancer   10.40.11.180   34.138.177.11   443:30258/TCP,3023:31802/TCP,3026:32182/TCP,3024:30101/TCP,3036:30302/TCP   22h
+service/teleport-auth       ClusterIP      10.40.8.251    <none>          3025/TCP,3026/TCP                                                           22h
+service/teleport-auth-v11   ClusterIP      None           <none>          <none>                                                                      22h
+service/teleport-auth-v12   ClusterIP      None           <none>          <none>                                                                      22h
 
 NAME                             READY   UP-TO-DATE   AVAILABLE   AGE
-deployment.apps/teleport-proxy   2/2     2            2           7m16s
+deployment.apps/teleport-auth    2/2     2            2           22h
+deployment.apps/teleport-proxy   2/2     2            2           22h
 
-NAME                                        DESIRED   CURRENT   READY   AGE
-replicaset.apps/teleport-proxy-b64dd8849    2         2         2       7m16s
-
-NAME                             READY   AGE
-statefulset.apps/teleport-auth   2/2     7m16s
+NAME                                       DESIRED   CURRENT   READY   AGE
+replicaset.apps/teleport-auth-57989d4cbd   2         2         2       22h
+replicaset.apps/teleport-proxy-c6bf55cfc   2         2         2       22h
 ```
 
 ## Step 6/7. Set up DNS
@@ -414,7 +415,7 @@ Create a user to be able to log into Teleport. This needs to be done on the Tele
 so we can run the command using `kubectl`:
 
 ```code
-$ kubectl --namespace teleport exec statefulset/teleport-auth -- tctl users add test --roles=access,editor
+$ kubectl --namespace teleport exec deployment/teleport-auth -- tctl users add test --roles=access,editor
 
 User "test" has been created but requires a password. Share this URL with the user to complete user setup, link is valid for 1h:
 https://teleport.example.com:443/web/invite/91cfbd08bc89122275006e48b516cc68
