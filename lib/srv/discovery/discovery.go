@@ -395,7 +395,7 @@ outer:
 }
 
 func (s *Server) handleAzureInstances(instances *server.AzureInstances) error {
-	client, err := s.Clients.GetAzureRunCommandClient(instances.Region)
+	client, err := s.Clients.GetAzureRunCommandClient(instances.SubscriptionID)
 	if err != nil {
 		return trace.Wrap(err)
 	}

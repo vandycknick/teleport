@@ -64,7 +64,7 @@ func (ai *AzureInstaller) Run(ctx context.Context, req AzureRunRequest) error {
 				ResourceGroup: req.ResourceGroup,
 				VMName:        aws.StringValue(inst.Name),
 				Parameters:    req.Params,
-				ScriptURI:     getInstallerScriptURI(req.ScriptName, req.PublicProxyAddr),
+				Script:        getInstallerScript(req.ScriptName, req.PublicProxyAddr),
 			}
 			return trace.Wrap(req.Client.Run(ctx, runRequest))
 		})
@@ -72,6 +72,6 @@ func (ai *AzureInstaller) Run(ctx context.Context, req AzureRunRequest) error {
 	return trace.Wrap(g.Wait())
 }
 
-func getInstallerScriptURI(installerName, publicProxyAddr string) string {
-	return fmt.Sprintf("https://%s/v1/webapi/installer/%v", publicProxyAddr, installerName)
+func getInstallerScript(installerName, publicProxyAddr string) string {
+	return fmt.Sprintf("curl -s -L https://%s/v1/webapi/scripts/installer/%v | bash", publicProxyAddr, installerName)
 }

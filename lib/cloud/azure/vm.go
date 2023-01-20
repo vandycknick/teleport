@@ -151,8 +151,8 @@ type RunCommandRequest struct {
 	ResourceGroup string
 	// VMName is the name of the VM.
 	VMName string
-	// ScriptURI is the URI of the script for the virtual machine to execute.
-	ScriptURI string
+	// Script is the URI of the script for the virtual machine to execute.
+	Script string
 	// Parameters is a map of parameters for the script.
 	Parameters map[string]string
 }
@@ -199,7 +199,7 @@ func (c *runCommandClient) Run(ctx context.Context, req RunCommandRequest) error
 			AsyncExecution: to.Ptr(false),
 			Parameters:     params,
 			Source: &armcompute.VirtualMachineRunCommandScriptSource{
-				ScriptURI: to.Ptr(req.ScriptURI),
+				Script: to.Ptr(req.Script),
 			},
 		},
 	}, nil)
