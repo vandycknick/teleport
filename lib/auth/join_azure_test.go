@@ -41,6 +41,24 @@ import (
 	"github.com/gravitational/teleport/lib/fixtures"
 )
 
+func withCerts(certs []*x509.Certificate) azureRegisterOption {
+	return func(cfg *azureRegisterConfig) {
+		cfg.certs = certs
+	}
+}
+
+func withVerifyFunc(verify azureVerifyTokenFunc) azureRegisterOption {
+	return func(cfg *azureRegisterConfig) {
+		cfg.verify = verify
+	}
+}
+
+func withVMClient(vmClient azure.VirtualMachinesClient) azureRegisterOption {
+	return func(cfg *azureRegisterConfig) {
+		cfg.vmClient = vmClient
+	}
+}
+
 type mockAzureVMClient struct {
 	azure.VirtualMachinesClient
 	vm *azure.VirtualMachine

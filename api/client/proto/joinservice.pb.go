@@ -224,7 +224,7 @@ func (m *RegisterUsingAzureMethodRequest) GetAccessToken() string {
 // a Challenge or signed Certs to join the cluster.
 type RegisterUsingAzureMethodResponse struct {
 	// Challenge is a crypto-random string that should be included in the signed
-	// sts:GetCallerIdentity request.
+	// attested data.
 	Challenge string `protobuf:"bytes,1,opt,name=challenge,proto3" json:"challenge,omitempty"`
 	// Certs is the returned signed certs.
 	Certs                *Certs   `protobuf:"bytes,2,opt,name=certs,proto3" json:"certs,omitempty"`

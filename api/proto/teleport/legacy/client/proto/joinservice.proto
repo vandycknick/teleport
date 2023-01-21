@@ -61,7 +61,7 @@ message RegisterUsingAzureMethodRequest {
 // a Challenge or signed Certs to join the cluster.
 message RegisterUsingAzureMethodResponse {
   // Challenge is a crypto-random string that should be included in the signed
-  // sts:GetCallerIdentity request.
+  // attested data.
   string challenge = 1;
   // Certs is the returned signed certs.
   Certs certs = 2;

@@ -23,6 +23,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net"
+	"net/url"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -42,6 +43,9 @@ import (
 )
 
 const azureAccessTokenAudience = "https://management.azure.com/"
+
+// Structs for unmarshaling attested data. Schema can be found at
+// https://learn.microsoft.com/en-us/azure/virtual-machines/linux/instance-metadata-service?tabs=linux#response-2
 
 type signedAttestedData struct {
 	Encoding  string `json:"encoding"`
@@ -91,6 +95,7 @@ func azureVerifyFuncFromOIDCVerifier(cfg *oidc.Config) azureVerifyTokenFunc {
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
+		// Need to get the tenant ID before we verify so we can construct the issuer URL.
 		var unverifiedClaims accessTokenClaims
 		if err := token.UnsafeClaimsWithoutVerification(&unverifiedClaims); err != nil {
 			return nil, trace.Wrap(err)
@@ -135,24 +140,6 @@ func (cfg *azureRegisterConfig) CheckAndSetDefaults(ctx context.Context) error {
 
 type azureRegisterOption func(cfg *azureRegisterConfig)
 
-func withCerts(certs []*x509.Certificate) azureRegisterOption {
-	return func(cfg *azureRegisterConfig) {
-		cfg.certs = certs
-	}
-}
-
-func withVerifyFunc(verify azureVerifyTokenFunc) azureRegisterOption {
-	return func(cfg *azureRegisterConfig) {
-		cfg.verify = verify
-	}
-}
-
-func withVMClient(vmClient azure.VirtualMachinesClient) azureRegisterOption {
-	return func(cfg *azureRegisterConfig) {
-		cfg.vmClient = vmClient
-	}
-}
-
 // parseAndVeryAttestedData verifies that an attested data document was signed
 // by Azure. If verification is successful, it returns the ID of the VM that
 // produced the document.
@@ -165,7 +152,7 @@ func parseAndVerifyAttestedData(adBytes []byte, challenge string, certs []*x509.
 		return "", trace.AccessDenied("unsupported signature type: %v", signedAD.Encoding)
 	}
 
-	sigPEM := fmt.Sprintf("-----BEGIN PKCS7-----\n%s\n-----END PKCS7-----", signedAD.Signature)
+	sigPEM := "-----BEGIN PKCS7-----\n" + signedAD.Signature + "\n-----END PKCS7-----"
 	sigBER, _ := pem.Decode([]byte(sigPEM))
 	if sigBER == nil {
 		return "", trace.AccessDenied("unable to decode attested data document")
@@ -206,9 +193,16 @@ func verifyVMIdentity(ctx context.Context, cfg *azureRegisterConfig, accessToken
 		return nil, trace.Wrap(err)
 	}
 
-	expectedIssuer := fmt.Sprintf("https://sts.windows.net/%v/", tokenClaims.TenantID)
+	expectedIssuer, err := url.JoinPath("https://sts.windows.net", tokenClaims.TenantID, "/")
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	// v2 tokens have the version appended to the issuer.
 	if tokenClaims.Version == "2.0" {
-		expectedIssuer += "2.0"
+		expectedIssuer, err = url.JoinPath(expectedIssuer, "2.0")
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
 	}
 
 	expectedClaims := jwt.Expected{
@@ -352,6 +346,12 @@ func (a *Server) RegisterUsingAzureMethod(ctx context.Context, challengeResponse
 
 // fixAzureSigningAlgorithm fixes a mismatch between the object IDs of the
 // hashing algorithm sent by Azure vs the ones expected by the pkcs7 library.
+// Specifically, Azure (incorrectly?) sends a [digest encryption algorithm]
+// where the pkcs7 structure's [signerInfo] expects a [digest algorithm].
+//
+// [signerInfo]: https://www.rfc-editor.org/rfc/rfc2315#section-6.4
+// [digest algorithm]: https://www.rfc-editor.org/rfc/rfc2315#section-6.3
+// [digest encryption algorithm]: https://www.rfc-editor.org/rfc/rfc2315#section-6.4
 func fixAzureSigningAlgorithm(p7 *pkcs7.PKCS7) {
 	for i, signer := range p7.Signers {
 		if signer.DigestAlgorithm.Algorithm.Equal(pkcs7.OIDEncryptionAlgorithmRSASHA256) {
