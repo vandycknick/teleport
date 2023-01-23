@@ -23,7 +23,7 @@ Allow OpenSSH nodes to be registered in a Teleport cluster.
 
 ### Registering nodes
 
-A new sub-kind to the `node` resource will be added for registered OpenSSH nodes: `openssh`. The absence of a `node` resource sub-kind will imply that a node is a Teleport agent node, making this change backwards compatible.
+A new sub-kind to the `node` resource will be added for registered OpenSSH nodes: `openssh`. The absence of a `node` resource sub-kind (or presence of a `teleport` sub-kind) will imply that a node is a Teleport agent node, making this change backwards compatible.
 
 #### Registering with `tctl`
 
