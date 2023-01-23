@@ -23,7 +23,7 @@ Allow OpenSSH nodes to be registered in a Teleport cluster.
 
 ### Registering nodes
 
-A new sub-kind to the `node` resource will be added for registered OpenSSH nodes: `agentless`. The absence of a `node` resource sub-kind will imply that a node is a Teleport agent node, making this change backwards compatible.
+A new sub-kind to the `node` resource will be added for registered OpenSSH nodes: `openssh`. The absence of a `node` resource sub-kind will imply that a node is a Teleport agent node, making this change backwards compatible.
 
 #### Registering with `tctl`
 
@@ -39,11 +39,11 @@ spec:
 version: v2
 ```
 
-`tctl` will auto-generate `metadata.name` if it is not already set so users don't have to generate GUIDs themselves if `sub_kind` is `agentless`. Also, if `sub_kind` is set to `agentless`, `spec.public_addr` will not be allowed for registered OpenSSH nodes as it is not needed. An example of a registered OpenSSH node resource:
+`tctl` will auto-generate `metadata.name` if it is not already set so users don't have to generate GUIDs themselves if `sub_kind` is `openssh`. Also, if `sub_kind` is set to `openssh`, `spec.public_addr` will not be allowed for registered OpenSSH nodes as it is not needed. An example of a registered OpenSSH node resource:
 
 ```yaml
 kind: node
-sub_kind: agentless
+sub_kind: openssh
 metadata:
   name: 5da56852-2adb-4540-a37c-80790203f6a9
 spec:
@@ -52,49 +52,20 @@ spec:
 version: v2
 ```
 
-### Agentless CA
+### OpenSSH CA
 
-For security related reasons that will be discussed below, a new CA will be added called Agentless CA. The Agentless CA will be responsible for generating and signing user certificates that will be used to authenticate with registered OpenSSH nodes. The public key of the Agentless CA will be copied to all registered OpenSSH nodes and configured as `TrustedUserCAKeys` in `sshd_config`.
+For security related reasons that will be discussed below, a new CA will be added called OpenSSH CA. The OpenSSH CA will be responsible for generating and signing user certificates that will be used to authenticate with registered OpenSSH nodes. The public key of the OpenSSH CA will be copied to all registered OpenSSH nodes and configured as `TrustedUserCAKeys` in `sshd_config`.
 
 ### RBAC
 
-When OpenSSH nodes are registered currently, RBAC checks for those nodes are not performed. RBAC logic will have to be updated so RBAC checks for registered OpenSSH nodes are performed. There are multiple ways to implement this, each with their own advantages and disadvantages.
 
-#### Option 1
-
-Each registered OpenSSH node will have a unique Agentless CA. The CA public key will include information about the node that it was created for, including the node's UUID and the node's labels. When `(lib/srv.AuthHandlers).UserKeyAuth` is called to authenticate a node's user certificate, it will check if node information is present in the CA public key. If node information is present, an RBAC check will be performed using the label information in the CA public key.
-
-Pros:
-
-- No need to lookup node resources to perform RBAC checks
-
-Cons:
-
-- Requires connecting to node to perform RBAC check
-- Updating node labels requires generating and distributing a new host key
-- CA rotation is more complex as every registered OpenSSH node requires a unique CA
-
-#### Option 2
-
-When a user sends a request to a Proxy to connect to a node, the Proxy will attempt to find a node resource by either its hostname or IP, whichever the user specified. If the resource exists and has the `agentless` `sub_kind`, an RBAC check will be performed. If the resource does not exist or isn't an `agentless` node, the connection flow will continue as normal.
-
-Pros:
-
-- No need to connect to node to perform RBAC check
-- Updating node labels can simply be done by using `tctl`
-- CA rotation is simple as every registered OpenSSH node will have the same CA
-
-Cons: none (that I can think of)
-
-#### My choice: Option 2
-
-Option 2 makes CA rotation and updating node labels much easier, and has the only downside of having to search for node resources before connecting to one. 
+When a user sends a request to a Proxy to connect to a node, the Proxy will attempt to find a node resource by either its hostname or IP, whichever the user specified. If the resource exists and has the `openssh` `sub_kind`, an RBAC check will be performed. If the resource does not exist or isn't an `openssh` node, the connection flow will continue as normal.
 
 ### Security
 
 Both RBAC checks and session recording for registered OpenSSH nodes require that users connect through a Proxy. If users are able to connect to registered OpenSSH nodes directly, they can bypass both features. Currently the User CA public key is copied to OpenSSH nodes and configured to be trusted by `sshd`. This means OpenSSH nodes will accept certificates that are signed by the User CA. The problem with that is when Teleport users authenticate with a cluster, the Auth server replies with a certificate that is signed by the User CA. Users could potentially use this certificate to directly connect to registered OpenSSH nodes.
 
-Using the new Agentless CA to sign certificates used to authenticate with registered OpenSSH nodes solves this problem, as Teleport users do not have access to any certificates signed by the Agentless CA.
+Using the new OpenSSH CA to sign certificates used to authenticate with registered OpenSSH nodes solves this problem, as Teleport users do not have access to any certificates signed by the OpenSSH CA.
 
 ### UX
 
