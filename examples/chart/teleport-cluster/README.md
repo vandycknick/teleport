@@ -27,7 +27,7 @@ $ helm install teleport/teleport-cluster \
 
 Finally, configure the DNS for `teleport.example.com` to point to the newly created LoadBalancer.
 
-Note: this getting-started uses the built-in ACME client to get certificates.
+Note: this guide uses the built-in ACME client to get certificates.
 In this setup, Teleport nodes cannot be replicated. If you want to run multiple
 Teleport replicas, you must provide a certificate through `tls.existingSecretName`
 or by installing [cert-manager](https://cert-manager.io/docs/) and setting the `highAvailability.certManager.*` values.

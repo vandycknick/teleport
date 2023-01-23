@@ -173,7 +173,7 @@
               "forScopes": ["oss", "enterprise"]
             },
             {
-              "title": "Migrating From v11 to v12",
+              "title": "Migrating from v11 to v12",
               "slug": "/deploy-a-cluster/helm-deployments/migration-v12/",
               "forScopes": ["oss", "enterprise"]
             }
