@@ -114,15 +114,15 @@ to create a public IP for Teleport.
     teleport-cluster-auth   ClusterIP      10.4.2.51    <none>           3025/TCP,3026/TCP              89s
 
     # Save the pod IP or hostname.
-    $ MYIP=$(kubectl get services teleport-cluster -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-    $ echo $MYIP
+    $ SERVICE_IP=$(kubectl get services teleport-cluster -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+    $ echo $SERVICE_IP
     104.199.126.88
     ```
 
-    If `$MYIP` is blank, your cloud provider may have assigned a hostname to the load balancer rather than an IP address. Run the following command to retrieve the hostname, which you will use in place of `$MYIP` for subsequent commands.
+    If `$SERVICE_IP` is blank, your cloud provider may have assigned a hostname to the load balancer rather than an IP address. Run the following command to retrieve the hostname, which you will use in place of `$SERVICE_IP` for subsequent commands.
 
     ```code
-    $ MYIP=$(kubectl get services teleport-cluster -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+    $ SERVICE_IP=$(kubectl get services teleport-cluster -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
     ```
   </TabItem>
 
@@ -138,15 +138,15 @@ to create a public IP for Teleport.
     teleport-cluster-ent-auth   ClusterIP      10.4.2.51    <none>           3025/TCP,3026/TCP              89s
 
     # Save the pod IP or hostname.
-    $ MYIP=$(kubectl get services teleport-cluster-ent -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-    $ echo $MYIP
+    $ SERVICE_IP=$(kubectl get services teleport-cluster-ent -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+    $ echo $SERVICE_IP
     104.199.126.88
     ```
 
-    If `$MYIP` is blank, your cloud provider may have assigned a hostname to the load balancer rather than an IP address. Run the following command to retrieve the hostname, which you will use in place of `$MYIP` for subsequent commands.
+    If `$SERVICE_IP` is blank, your cloud provider may have assigned a hostname to the load balancer rather than an IP address. Run the following command to retrieve the hostname, which you will use in place of `$SERVICE_IP` for subsequent commands.
 
     ```code
-    $ MYIP=$(kubectl get services teleport-cluster -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+    $ SERVICE_IP=$(kubectl get services teleport-cluster -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
     ```
   </TabItem>
 </Tabs>
@@ -240,14 +240,13 @@ For other install options, check out the [installation guide](../../installation
   </TabItem>
 </Tabs>
 
-Try `tsh login` with a local user. Use a custom `KUBECONFIG` to prevent overwriting
-the default one in case there is a problem.
+Try `tsh login` with a local user.
 
 ```code
-$ KUBECONFIG=${HOME?}/teleport.yaml tsh login --proxy=tele.example.com:443 --user=alice
+$ tsh login --proxy=tele.example.com:443 --user=alice
 ```
 
-Teleport updates `KUBECONFIG` with a short-lived 12-hour certificate.
+Once you're connected to the Teleport cluster, list the available Kubernetes clusters for your user:
 
 ```code
 # List connected Kubernetes clusters
@@ -256,12 +255,16 @@ $ tsh kube ls
 Kube Cluster Name Selected
 ----------------- --------
 tele.example.com
-Login to Kubernetes by name
+```
 
-$ tsh kube login tele.example.com
+Login to the Kubernetes cluster and create a new separate kubeconfig to connect to the Kubernetes cluster.
+Using a separate kubeconfig file allows you to easily switch between the kubeconfig you used to install
+Teleport and the one issued by Teleport. This is useful during the install process if something goes wrong.
 
-# Once working, remove the KUBECONFIG= override to switch to teleport
-$ KUBECONFIG=${HOME?}/teleport.yaml kubectl get -n teleport-cluster pods
+```
+$ KUBECONFIG=$HOME/teleport-kubeconfig.yaml tsh kube login tele.example.com
+
+$ KUBECONFIG=$HOME/teleport-kubeconfig.yaml kubectl get -n teleport-cluster pods
 NAME                                      READY   STATUS    RESTARTS   AGE
 pod/teleport-cluster-auth-57989d4-4q2ds   1/1     Running   0          22h
 pod/teleport-cluster-auth-57989d4-rtrzn   1/1     Running   0          22h

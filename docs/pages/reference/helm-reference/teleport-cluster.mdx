@@ -81,7 +81,7 @@ the IP, or a CNAME record pointing to the hostname of the Kubernetes load balanc
 </Admonition>
 
 <Admonition type="warning">
-The `clusterName` cannot be changed during a Teleport cluster's lifespan.
+The `clusterName` cannot be changed during a Teleport cluster's lifespan.hugo/chart-split-docs
 If you need to change it, you must redeploy a completely new cluster.
 </Admonition>
 
@@ -123,6 +123,12 @@ auth:
 `auth.teleportConfig` contains YAML teleport configuration for auth pods.
 The configuration will be merged with the chart-generated configuration
 and will take precedence in case of conflict.
+
+The merge logic is the following:
+- object fields are merged recursively
+- lists are replaced
+- values (string, integer, boolean, ...) are replaced
+- fields can be unset by setting them to `null` or `~`
 
 See the [Teleport Configuration Reference](../config.mdx) for the list of supported fields.
 
@@ -166,6 +172,12 @@ proxy:
 `proxy.teleportConfig` contains YAML teleport configuration for proxy pods
 The configuration will be merged with the chart-generated configuration
 and will take precedence in case of conflict.
+
+The merge logic is the following:
+- object fields are merged recursively
+- lists are replaced
+- values (string, integer, boolean, ...) are replaced
+- fields can be unset by setting them to `null` or `~`
 
 See the [Teleport Configuration Reference](../config.mdx) for the list of supported fields.
 
