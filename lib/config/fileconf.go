@@ -560,7 +560,7 @@ func checkAndSetDefaultsForAzureMatchers(matcherInput []AzureMatcher) error {
 			}
 		}
 
-		if slices.Contains(matcher.Types, constants.AzureServiceTypeVM) {
+		if slices.Contains(matcher.Types, services.AzureMatcherVM) {
 			if matcher.InstallParams == nil {
 				matcher.InstallParams = &InstallParams{
 					JoinParams: JoinParams{

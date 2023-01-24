@@ -18,6 +18,7 @@ package discovery
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -39,6 +40,8 @@ import (
 	"github.com/gravitational/teleport/lib/srv/discovery/fetchers/db"
 	"github.com/gravitational/teleport/lib/srv/server"
 )
+
+var errNoInstances = trace.NotFound("all fetched nodes already enrolled")
 
 // Config provides configuration for the discovery server.
 type Config struct {
@@ -432,7 +435,7 @@ func (s *Server) handleAzureInstances(instances *server.AzureInstances) error {
 	}
 	s.filterExistingAzureNodes(instances)
 	if len(instances.Instances) == 0 {
-		return trace.NotFound("all fetched nodes already enrolled")
+		return trace.Wrap(errNoInstances)
 	}
 
 	s.Log.Debugf("Running Teleport installation on these virtual machines: SubscriptionID: %s, VMs: %s",
@@ -460,7 +463,7 @@ func (s *Server) handleAzureDiscovery() {
 				instances.SubscriptionID, genAzureInstancesLogStr(azureInstances.Instances),
 			)
 			if err := s.handleAzureInstances(azureInstances); err != nil {
-				if trace.IsNotFound(err) {
+				if errors.Is(err, errNoInstances) {
 					s.Log.Debug("All discovered Azure VMs are already part of the cluster.")
 				} else {
 					s.Log.WithError(err).Error("Failed to enroll discovered Azure VMs.")
