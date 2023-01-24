@@ -23,7 +23,6 @@ import (
 	"github.com/gravitational/trace"
 	"go.mongodb.org/mongo-driver/x/mongo/driver"
 
-	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/services"
 	"github.com/gravitational/teleport/lib/srv/db/common"
 	"github.com/gravitational/teleport/lib/srv/db/common/role"
@@ -211,7 +210,7 @@ func (e *Engine) checkClientMessage(sessionCtx *common.Session, message protocol
 	return sessionCtx.Checker.CheckAccess(sessionCtx.Database,
 		services.AccessState{MFAVerified: true},
 		role.DatabaseRoleMatchers(
-			defaults.ProtocolMongoDB,
+			sessionCtx.Database,
 			sessionCtx.DatabaseUser,
 			database)...)
 }

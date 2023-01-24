@@ -1071,9 +1071,12 @@ func MatchDatabaseName(selectors []string, name string) (bool, string) {
 }
 
 // MatchDatabaseUser returns true if provided database user matches selectors.
-func MatchDatabaseUser(selectors []string, user string) (bool, string) {
+func MatchDatabaseUser(selectors []string, user string, matchWildcard bool) (bool, string) {
 	for _, u := range selectors {
-		if u == user || u == types.Wildcard {
+		if u == user {
+			return true, "matched"
+		}
+		if matchWildcard && u == types.Wildcard {
 			return true, "matched"
 		}
 	}
@@ -2032,15 +2035,29 @@ func (m RoleMatchers) MatchAny(role types.Role, condition types.RoleConditionTyp
 	return false, nil, nil
 }
 
+type DatabaseAlternativeUserFunc func(string) (string, bool)
+
 // DatabaseUserMatcher matches a role against database account name.
 type DatabaseUserMatcher struct {
-	User string
+	User             string
+	AlternativeUsers []DatabaseAlternativeUserFunc
 }
 
 // Match matches database account name against provided role and condition.
 func (m *DatabaseUserMatcher) Match(role types.Role, condition types.RoleConditionType) (bool, error) {
-	match, _ := MatchDatabaseUser(role.GetDatabaseUsers(condition), m.User)
-	return match, nil
+	selectors := role.GetDatabaseUsers(condition)
+	if match, _ := MatchDatabaseUser(selectors, m.User, true); match {
+		return true, nil
+	}
+
+	for _, makeAltUser := range m.AlternativeUsers {
+		if altUser, ok := makeAltUser(m.User); ok {
+			if match, _ := MatchDatabaseUser(selectors, altUser, false); match {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 // String returns the matcher's string representation.
