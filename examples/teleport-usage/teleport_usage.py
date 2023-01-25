@@ -83,7 +83,6 @@ for protocol in protocols:
   for i in range((end_date - start_date).days + 1):
       current_date = start_date + datetime.timedelta(i)
       date = current_date.strftime("%Y-%m-%d")
-      # print(date)
       response = table.query(
           TableName=TABLE_NAME,
           IndexName="timesearchV2",
