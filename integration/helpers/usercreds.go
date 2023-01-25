@@ -39,6 +39,7 @@ type UserCreds struct {
 
 // SetupUserCreds sets up user credentials for client
 func SetupUserCreds(tc *client.TeleportClient, proxyHost string, creds UserCreds) error {
+	tc.SkipLocalAuth = true
 	err := tc.AddKey(&creds.Key)
 	if err != nil {
 		return trace.Wrap(err)
