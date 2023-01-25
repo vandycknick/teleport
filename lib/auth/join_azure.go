@@ -129,7 +129,7 @@ func (cfg *azureRegisterConfig) CheckAndSetDefaults(ctx context.Context) error {
 	}
 
 	if cfg.certs == nil {
-		certs, err := getAzureCerts()
+		certs, err := getAzureRootCerts()
 		if err != nil {
 			return trace.Wrap(err)
 		}
@@ -143,7 +143,7 @@ type azureRegisterOption func(cfg *azureRegisterConfig)
 // parseAndVeryAttestedData verifies that an attested data document was signed
 // by Azure. If verification is successful, it returns the ID of the VM that
 // produced the document.
-func parseAndVerifyAttestedData(adBytes []byte, challenge string, certs []*x509.Certificate) (string, error) {
+func parseAndVerifyAttestedData(ctx context.Context, adBytes []byte, challenge string, certs []*x509.Certificate) (string, error) {
 	var signedAD signedAttestedData
 	if err := utils.FastUnmarshal(adBytes, &signedAD); err != nil {
 		return "", trace.Wrap(err)
@@ -162,7 +162,18 @@ func parseAndVerifyAttestedData(adBytes []byte, challenge string, certs []*x509.
 	if err != nil {
 		return "", trace.Wrap(err)
 	}
+	if len(p7.Certificates) == 0 {
+		return "", trace.AccessDenied("no certificates for signature")
+	}
 	fixAzureSigningAlgorithm(p7)
+
+	intermediate, err := getAzureIssuerCert(ctx, p7.Certificates[0])
+	if err != nil {
+		return "", trace.Wrap(err)
+	}
+	if intermediate != nil {
+		p7.Certificates = append(p7.Certificates, intermediate)
+	}
 
 	pool := x509.NewCertPool()
 	for _, cert := range certs {
@@ -242,7 +253,7 @@ func verifyVMIdentity(ctx context.Context, cfg *azureRegisterConfig, accessToken
 
 	// If the token is from the system-assigned managed identity, the resource ID
 	// is for the VM itself and we can use it to look up the VM.
-	if slices.Contains(resourceID.ResourceType.Types, "virtualMachine") {
+	if slices.Contains(resourceID.ResourceType.Types, "virtualMachines") {
 		vm, err = vmClient.Get(ctx, tokenClaims.ResourceID)
 		if err != nil {
 			return nil, trace.Wrap(err)
@@ -294,7 +305,7 @@ func (a *Server) checkAzureRequest(ctx context.Context, challenge string, req *p
 		return trace.AccessDenied("this token does not support the Azure join method")
 	}
 
-	vmID, err := parseAndVerifyAttestedData(req.AttestedData, challenge, cfg.certs)
+	vmID, err := parseAndVerifyAttestedData(ctx, req.AttestedData, challenge, cfg.certs)
 	if err != nil {
 		return trace.Wrap(err)
 	}

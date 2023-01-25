@@ -68,6 +68,10 @@ func (m *mockAzureVMClient) Get(_ context.Context, _ string) (*azure.VirtualMach
 	return m.vm, nil
 }
 
+func (m *mockAzureVMClient) GetByVMID(_ context.Context, _, _ string) (*azure.VirtualMachine, error) {
+	return m.vm, nil
+}
+
 type azureChallengeResponseConfig struct {
 	Challenge string
 }
