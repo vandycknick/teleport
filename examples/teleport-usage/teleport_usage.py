@@ -55,7 +55,8 @@ unique_users = set()
 
 # Run Dynamodb query to retrieve all login for SSH for specified date range
 for i in range((end_date - start_date).days + 1):
-    current_date = start_date + datetime.timedelta(i)
+    current_date = start_date + datetime.timedelta(days=i)
+
     date = current_date.strftime("%Y-%m-%d")
     response = table.query(
         TableName=TABLE_NAME,
