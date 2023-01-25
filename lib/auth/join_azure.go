@@ -233,13 +233,36 @@ func verifyVMIdentity(ctx context.Context, cfg *azureRegisterConfig, accessToken
 		}
 	}
 
-	vm, err := vmClient.Get(ctx, tokenClaims.ResourceID)
+	resourceID, err := arm.ParseResourceID(tokenClaims.ResourceID)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	if vm.VMID != vmID {
-		return nil, trace.AccessDenied("vm ID does not match")
+
+	var vm *azure.VirtualMachine
+
+	// If the token is from the system-assigned managed identity, the resource ID
+	// is for the VM itself and we can use it to look up the VM.
+	if slices.Contains(resourceID.ResourceType.Types, "virtualMachine") {
+		vm, err = vmClient.Get(ctx, tokenClaims.ResourceID)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		if vm.VMID != vmID {
+			return nil, trace.AccessDenied("vm ID does not match")
+		}
+
+		// If the token is from a user-assigned managed identity, the resource ID is
+		// for the identity and we need to look the VM up by VM ID.
+	} else {
+		vm, err = vmClient.GetByVMID(ctx, resourceID.ResourceGroupName, vmID)
+		if err != nil {
+			if trace.IsNotFound(err) {
+				return nil, trace.AccessDenied("no VM found with matching VM ID")
+			}
+			return nil, trace.Wrap(err)
+		}
 	}
+
 	return vm, nil
 }
 

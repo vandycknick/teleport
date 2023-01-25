@@ -223,8 +223,12 @@ func (client *InstanceMetadataClient) GetAttestedData(ctx context.Context, nonce
 }
 
 // GetAccessToken gets an oauth2 access token from the instance.
-func (client *InstanceMetadataClient) GetAccessToken(ctx context.Context) (string, error) {
-	body, err := client.getRawMetadata(ctx, "/identity/oauth2/token", url.Values{"resource": []string{"https://management.azure.com/"}})
+func (client *InstanceMetadataClient) GetAccessToken(ctx context.Context, clientID string) (string, error) {
+	params := url.Values{"resource": []string{"https://management.azure.com/"}}
+	if clientID != "" {
+		params["client_id"] = []string{clientID}
+	}
+	body, err := client.getRawMetadata(ctx, "/identity/oauth2/token", params)
 	if err != nil {
 		return "", trace.Wrap(err)
 	}

@@ -90,6 +90,13 @@ func LocalRegister(id IdentityID, authServer *Server, additionalPrincipals, dnsN
 	return identity, nil
 }
 
+// AzureParams is the parameters specific to the azure join method.
+type AzureParams struct {
+	// ClientID is the client ID of the managed identity for Teleport to assume
+	// when authenticating a node.
+	ClientID string
+}
+
 // RegisterParams specifies parameters
 // for first time register operation with auth server
 type RegisterParams struct {
@@ -126,6 +133,8 @@ type RegisterParams struct {
 	// ec2IdentityDocument is used for Simplified Node Joining to prove the
 	// identity of a joining EC2 instance.
 	ec2IdentityDocument []byte
+	// AzureParams is the parameters specific to the azure join method.
+	AzureParams AzureParams
 	// CircuitBreakerConfig defines how the circuit breaker should behave.
 	CircuitBreakerConfig breaker.Config
 	// FIPS means FedRAMP/FIPS 140-2 compliant configuration was requested.
@@ -629,7 +638,7 @@ func registerUsingAzureMethod(client joinServiceClient, token string, params Reg
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
-		accessToken, err := imds.GetAccessToken(ctx)
+		accessToken, err := imds.GetAccessToken(ctx, params.AzureParams.ClientID)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
