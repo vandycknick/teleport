@@ -22,10 +22,11 @@ import (
 	"encoding/pem"
 	"net/http"
 
+	"github.com/gravitational/trace"
+
 	"github.com/gravitational/teleport"
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/utils"
-	"github.com/gravitational/trace"
 )
 
 // getAzureIssuerCert fetches a x509 certificate's issuing certificate.
