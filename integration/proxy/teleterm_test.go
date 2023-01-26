@@ -16,12 +16,12 @@ package proxy
 
 import (
 	"context"
-	"github.com/gravitational/teleport/api/types"
-	"github.com/gravitational/teleport/lib/teleterm/apiserver/handler"
+	"fmt"
 	"net"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gravitational/trace"
 	"github.com/jonboulle/clockwork"
 	"github.com/sirupsen/logrus"
@@ -29,12 +29,14 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/gravitational/teleport/api/types"
 	dbhelpers "github.com/gravitational/teleport/integration/db"
 	"github.com/gravitational/teleport/integration/helpers"
 	libclient "github.com/gravitational/teleport/lib/client"
 	"github.com/gravitational/teleport/lib/srv/db/mysql"
 	api "github.com/gravitational/teleport/lib/teleterm/api/protogen/golang/v1"
 	"github.com/gravitational/teleport/lib/teleterm/api/uri"
+	"github.com/gravitational/teleport/lib/teleterm/apiserver/handler"
 	"github.com/gravitational/teleport/lib/teleterm/clusters"
 	"github.com/gravitational/teleport/lib/teleterm/daemon"
 )
@@ -82,7 +84,7 @@ func testTeletermGatewaysCertRenewal(t *testing.T, pack *dbhelpers.DatabasePack)
 	t.Run("get cluster", func(t *testing.T) {
 		t.Parallel()
 
-		testGetCluster(t, pack, creds)
+		testGetCluster(t, pack)
 	})
 }
 
@@ -252,6 +254,7 @@ func testAddingRootCluster(t *testing.T, pack *dbhelpers.DatabasePack, creds *he
 	require.ElementsMatch(t, clusterURIs, []uri.ResourceURI{addedCluster.URI})
 }
 
+// TODO: Rename test name and function name to point at what we actually test.
 func testListRootClusters(t *testing.T, pack *dbhelpers.DatabasePack, creds *helpers.UserCreds) {
 	//TODO extract to helper function (simulate login)
 	tc, err := pack.Root.Cluster.NewClientWithCreds(helpers.ClientConfig{
@@ -291,33 +294,82 @@ func testListRootClusters(t *testing.T, pack *dbhelpers.DatabasePack, creds *hel
 	require.Equal(t, pack.Root.User.GetName(), response.Clusters[0].LoggedInUser.Name)
 }
 
-func testGetCluster(t *testing.T, pack *dbhelpers.DatabasePack, creds *helpers.UserCreds) {
-	username := pack.Root.User.GetName()
+// TODO: Rename test name and function name to point at what we actually test.
+func testGetCluster(t *testing.T, pack *dbhelpers.DatabasePack) {
+	authServer := pack.Root.Cluster.Process.GetAuthServer()
+
+	// Use random names to not collide with other tests.
+	uuid := uuid.NewString()
+	suggestedReviewer := "suggested-reviewer"
+	requestedRoleName := fmt.Sprintf("%s-%s", "requested-role", uuid)
+	userName := fmt.Sprintf("%s-%s", "user", uuid)
+	roleName := fmt.Sprintf("%s-%s", "get-cluster-role", uuid)
+
+	requestedRole, err := types.NewRole(requestedRoleName, types.RoleSpecV6{})
+	require.NoError(t, err)
+
 	// Create user role with ability to request role
-	userRole, err := types.NewRole(userRoleName, types.RoleSpecV6{
+	userRole, err := types.NewRole(roleName, types.RoleSpecV6{
 		Options: types.RoleOptions{},
 		Allow: types.RoleConditions{
 			Logins: []string{
-				username,
+				userName,
 			},
 			NodeLabels: types.Labels{types.Wildcard: []string{types.Wildcard}},
 			Request: &types.AccessRequestConditions{
-				Roles: []string{requestedRoleName},
+				Roles:              []string{requestedRoleName},
+				SuggestedReviewers: []string{suggestedReviewer},
 			},
 		},
 	})
 	require.NoError(t, err)
 
-	err = pack.Root.Cluster.Process.GetAuthServer().UpsertRole(ctx, userRole)
+	err = authServer.UpsertRole(context.Background(), requestedRole)
 	require.NoError(t, err)
 
-	user, err := types.NewUser(suite.Me.Username)
+	err = authServer.UpsertRole(context.Background(), userRole)
+	require.NoError(t, err)
+
+	user, err := types.NewUser(userName)
 	user.AddRole(userRole.GetName())
+	require.NoError(t, err)
+
+	watcher, err := authServer.NewWatcher(context.Background(), types.Watch{
+		Kinds: []types.WatchKind{
+			{Kind: types.KindUser},
+		},
+	})
+	require.NoError(t, err)
+	defer watcher.Close()
+
+	select {
+	case <-time.After(time.Second * 30):
+		t.Fatalf("Timeout waiting for OpInit event.")
+	case event := <-watcher.Events():
+		if event.Type != types.OpInit {
+			t.Fatalf("Unexpected event type.")
+		}
+		require.Equal(t, event.Type, types.OpInit)
+	case <-watcher.Done():
+		// TODO: Can we use t.Fatal in a subtest?
+		t.Fatal(watcher.Error())
+	}
+
+	t.Logf("%#v", user)
+	err = authServer.UpsertUser(user)
+	require.NoError(t, err)
+
+	WaitForResource(t, watcher, user.GetKind(), user.GetName())
+
+	creds, err := helpers.GenerateUserCreds(helpers.UserCredsRequest{
+		Process:  pack.Root.Cluster.Process,
+		Username: userName,
+	})
 	require.NoError(t, err)
 
 	//TODO extract to helper function (simulate login)
 	tc, err := pack.Root.Cluster.NewClientWithCreds(helpers.ClientConfig{
-		Login:   pack.Root.User.GetName(),
+		Login:   userName,
 		Cluster: pack.Root.Cluster.Secrets.SiteName,
 	}, *creds)
 	require.NoError(t, err)
@@ -355,7 +407,26 @@ func testGetCluster(t *testing.T, pack *dbhelpers.DatabasePack, creds *helpers.U
 	require.NoError(t, err)
 
 	t.Logf("%#v", response.LoggedInUser)
-	require.Equal(t, pack.Root.User.GetName(), "")
+	require.Equal(t, userName, response.LoggedInUser.Name)
+	require.ElementsMatch(t, []string{requestedRoleName}, response.LoggedInUser.RequestableRoles)
+	require.ElementsMatch(t, []string{suggestedReviewer}, response.LoggedInUser.SuggestedReviewers)
+}
 
-	pack.Root.Cluster.
+func WaitForResource(t *testing.T, watcher types.Watcher, kind, name string) {
+	timeout := time.After(time.Second * 15)
+	for {
+		select {
+		case <-timeout:
+			t.Fatalf("Timeout waiting for event.")
+		case event := <-watcher.Events():
+			if event.Type != types.OpPut {
+				continue
+			}
+			if event.Resource.GetKind() == kind && event.Resource.GetMetadata().Name == name {
+				return
+			}
+		case <-watcher.Done():
+			t.Fatalf("Watcher error %s.", watcher.Error())
+		}
+	}
 }
