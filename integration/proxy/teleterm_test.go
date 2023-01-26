@@ -16,6 +16,8 @@ package proxy
 
 import (
 	"context"
+	"github.com/gravitational/teleport/api/types"
+	"github.com/gravitational/teleport/lib/teleterm/apiserver/handler"
 	"net"
 	"testing"
 	"time"
@@ -71,6 +73,16 @@ func testTeletermGatewaysCertRenewal(t *testing.T, pack *dbhelpers.DatabasePack)
 		t.Parallel()
 
 		testAddingRootCluster(t, pack, creds)
+	})
+	t.Run("list root clusters", func(t *testing.T) {
+		t.Parallel()
+
+		testListRootClusters(t, pack, creds)
+	})
+	t.Run("get cluster", func(t *testing.T) {
+		t.Parallel()
+
+		testGetCluster(t, pack, creds)
 	})
 }
 
@@ -238,4 +250,112 @@ func testAddingRootCluster(t *testing.T, pack *dbhelpers.DatabasePack, creds *he
 		clusterURIs = append(clusterURIs, cluster.URI)
 	}
 	require.ElementsMatch(t, clusterURIs, []uri.ResourceURI{addedCluster.URI})
+}
+
+func testListRootClusters(t *testing.T, pack *dbhelpers.DatabasePack, creds *helpers.UserCreds) {
+	//TODO extract to helper function (simulate login)
+	tc, err := pack.Root.Cluster.NewClientWithCreds(helpers.ClientConfig{
+		Login:   pack.Root.User.GetName(),
+		Cluster: pack.Root.Cluster.Secrets.SiteName,
+	}, *creds)
+	require.NoError(t, err)
+	// The profile on disk created by NewClientWithCreds doesn't have WebProxyAddr set.
+	tc.WebProxyAddr = pack.Root.Cluster.Web
+	tc.SaveProfile(false /* makeCurrent */)
+
+	storage, err := clusters.NewStorage(clusters.Config{
+		Dir:                tc.KeysDir,
+		InsecureSkipVerify: tc.InsecureSkipVerify,
+	})
+	require.NoError(t, err)
+
+	daemonService, err := daemon.New(daemon.Config{
+		Storage: storage,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		daemonService.Stop()
+	})
+
+	handler, err := handler.New(
+		handler.Config{
+			DaemonService: daemonService,
+		},
+	)
+	require.NoError(t, err)
+
+	response, err := handler.ListRootClusters(context.Background(), &api.ListClustersRequest{})
+	require.NoError(t, err)
+
+	require.Equal(t, 1, len(response.Clusters))
+	require.Equal(t, pack.Root.User.GetName(), response.Clusters[0].LoggedInUser.Name)
+}
+
+func testGetCluster(t *testing.T, pack *dbhelpers.DatabasePack, creds *helpers.UserCreds) {
+	username := pack.Root.User.GetName()
+	// Create user role with ability to request role
+	userRole, err := types.NewRole(userRoleName, types.RoleSpecV6{
+		Options: types.RoleOptions{},
+		Allow: types.RoleConditions{
+			Logins: []string{
+				username,
+			},
+			NodeLabels: types.Labels{types.Wildcard: []string{types.Wildcard}},
+			Request: &types.AccessRequestConditions{
+				Roles: []string{requestedRoleName},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	err = pack.Root.Cluster.Process.GetAuthServer().UpsertRole(ctx, userRole)
+	require.NoError(t, err)
+
+	user, err := types.NewUser(suite.Me.Username)
+	user.AddRole(userRole.GetName())
+	require.NoError(t, err)
+
+	//TODO extract to helper function (simulate login)
+	tc, err := pack.Root.Cluster.NewClientWithCreds(helpers.ClientConfig{
+		Login:   pack.Root.User.GetName(),
+		Cluster: pack.Root.Cluster.Secrets.SiteName,
+	}, *creds)
+	require.NoError(t, err)
+	// The profile on disk created by NewClientWithCreds doesn't have WebProxyAddr set.
+	tc.WebProxyAddr = pack.Root.Cluster.Web
+	tc.SaveProfile(false /* makeCurrent */)
+
+	storage, err := clusters.NewStorage(clusters.Config{
+		Dir:                tc.KeysDir,
+		InsecureSkipVerify: tc.InsecureSkipVerify,
+	})
+	require.NoError(t, err)
+
+	daemonService, err := daemon.New(daemon.Config{
+		Storage: storage,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		daemonService.Stop()
+	})
+
+	handler, err := handler.New(
+		handler.Config{
+			DaemonService: daemonService,
+		},
+	)
+	require.NoError(t, err)
+
+	rootClusterName, _, err := net.SplitHostPort(pack.Root.Cluster.Web)
+	require.NoError(t, err)
+
+	response, err := handler.GetCluster(context.Background(), &api.GetClusterRequest{
+		ClusterUri: uri.NewClusterURI(rootClusterName).String(),
+	})
+	require.NoError(t, err)
+
+	t.Logf("%#v", response.LoggedInUser)
+	require.Equal(t, pack.Root.User.GetName(), "")
+
+	pack.Root.Cluster.
 }
