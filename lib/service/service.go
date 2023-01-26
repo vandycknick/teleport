@@ -3972,7 +3972,19 @@ func (process *TeleportProcess) initProxyEndpoint(conn *Connector) error {
 	)
 	if alpnRouter != nil {
 		grpcServerInsecure = createInsecureGRPCServer(process, log, proxyLimiter, conn, listeners.grpcInsecure)
-		grpcServerSecure = createSecureGRPCServer(process, log, proxyLimiter, listeners.grpcSecured, serverTLSConfig)
+		grpcTLSConfig, err := conn.ServerIdentity.TLSConfig(cfg.CipherSuites)
+		if err != nil {
+			return trace.Wrap(err)
+		}
+		grpcTLSConfig.ClientAuth = tls.RequireAndVerifyClientCert
+		grpcServerSecure = createSecureGRPCServer(
+			process,
+			log,
+			proxyLimiter,
+			conn,
+			listeners.grpcSecured,
+			grpcTLSConfig,
+		)
 	}
 
 	var alpnServer *alpnproxy.Proxy
@@ -5203,23 +5215,31 @@ func createSecureGRPCServer(
 	process *TeleportProcess,
 	log logrus.FieldLogger,
 	limiter *limiter.Limiter,
+	conn *Connector,
 	listener net.Listener,
 	serverTLSConfig *tls.Config,
 ) *grpc.Server {
 	if !process.Config.Proxy.Kube.Enabled {
 		return nil
 	}
+	// authMiddleware authenticates request assuming TLS client authentication
+	// adds authentication information to the context
+	// and passes it to the API server
+	authMiddleware := &auth.Middleware{
+		AccessPoint: conn.Client,
+		Limiter:     limiter,
+	}
 
 	server := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			utils.GRPCServerUnaryErrorInterceptor,
-			limiter.UnaryServerInterceptor(),
 			otelgrpc.UnaryServerInterceptor(),
+			authMiddleware.UnaryInterceptor(),
 		),
 		grpc.ChainStreamInterceptor(
 			utils.GRPCServerStreamErrorInterceptor,
-			limiter.StreamServerInterceptor,
 			otelgrpc.StreamServerInterceptor(),
+			authMiddleware.StreamInterceptor(),
 		),
 		grpc.Creds(credentials.NewTLS(serverTLSConfig)),
 	)
